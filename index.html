@@ -456,7 +456,6 @@
       <div class="filters">
         <div class="filter-label">曜日</div><div class="chips" id="freeDayChips"></div>
         <div class="filter-label">時限</div><div class="chips" id="freePeriodChips"></div>
-        <div class="filter-label">学年で<br>絞る</div><div class="chips" id="freeGradeChips"></div>
       </div>
     </div>
     <div id="freeNote"></div><div id="freeOut"></div>
@@ -1773,7 +1772,7 @@ function exportPersonJson(){
 }
 
 /* ========== 空き教室タブ ========== */
-const fstate={day:null,period:null,grade:null};
+const fstate={day:null,period:null};
 function roomCat(rm){return SPECIAL_ROOMS.includes(rm)?"special":"normal";}
 function normRooms(rm){const ALIAS={"エアラインルーム":"エアーラインルーム","403・404":"403・4","カフェ":"1Fカフェ"};
   const out=[];(rm||"").split(/[/／]/).forEach(part=>{part=part.trim().replace(/^[A-Za-z0-9]+[：:]/,"").replace(/\s*【.*?】/,"").trim();
@@ -1783,10 +1782,9 @@ function roomUsage(grade){const use={};ROOMS.forEach(rm=>use[rm]={});
     (use[rm][r.day+"-"+r.period]=use[rm][r.day+"-"+r.period]||[]).push(r);});});return use;}
 makeChips("freeDayChips",DAYS.map(d=>({label:d,val:d})),"day",null,fstate,()=>{renderFree();refreshChips("#freeView",fstate);});
 makeChips("freePeriodChips",[1,2,3,4,5].map(p=>({label:p+"限",val:p})),"period",null,fstate,()=>{renderFree();refreshChips("#freeView",fstate);});
-makeChips("freeGradeChips",[1,2,3,4].map(g=>({label:g+"年のみ",val:g})),"grade",it=>"g"+it.val,fstate,()=>{renderFree();refreshChips("#freeView",fstate);});
 function roomCard(rm,extra,busy){return `<div class="room-card ${busy?'busy-card':roomCat(rm)}"><span class="room-name">${esc(rm)}</span>${extra||""}</div>`;}
 function renderFree(){const note=document.getElementById("freeNote"),out=document.getElementById("freeOut");
-  const use=roomUsage(fstate.grade);const gl=fstate.grade?`（${fstate.grade}年の授業のみで判定）`:"";
+  const use=roomUsage();const gl="";
   const termL=term==="early"?"前期":"後期";
   const day=fstate.day,period=fstate.period;
   if(!day||!period){const hint=(NOW.day&&NOW.period)?`いまは ${NOW.day}曜${NOW.period}限 です。`:"";
