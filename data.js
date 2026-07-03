@@ -37,7 +37,43 @@ export default async function handler(req, res) {
       const raw = await kv(["GET", KEY]);
       if (!raw) return res.status(200).json({ exists: false });
       const data = JSON.parse(raw);
-      return res.status(200).json({ exists: true, ...data });
+
+      // 1) 編集パスワード付き → 全データ（学生別を含む）
+      const tok = req.headers["x-edit-token"];
+      if (tok) {
+        if (process.env.EDIT_TOKEN && tok === process.env.EDIT_TOKEN) {
+          return res.status(200).json({ exists: true, ...data });
+        }
+        return res.status(401).json({ error: "unauthorized" });
+      }
+
+      // 2) 学生キー付き（?s=XXXX）→ クラス時間割 + 本人の学生データのみ
+      const sKey = req.query && req.query.s ? String(req.query.s) : null;
+      const base = {
+        exists: true,
+        lateRecords: data.lateRecords || [],
+        earlyEdits: data.earlyEdits || {},
+        updatedAt: data.updatedAt || null,
+      };
+      if (sKey) {
+        const stu = (data.latePersons || []).find((p) => p && p.key === sKey);
+        if (!stu) {
+          return res
+            .status(200)
+            .json({ ...base, latePersons: [], lateP: [], student: false });
+        }
+        return res.status(200).json({
+          ...base,
+          latePersons: [stu],
+          lateP: (data.lateP || []).filter((r) => r && r.person === stu.name),
+          student: true,
+        });
+      }
+
+      // 3) 公開（キー無し）→ クラス時間割のみ。学生データは返さない
+      return res
+        .status(200)
+        .json({ ...base, latePersons: [], lateP: [], studentsHidden: true });
     }
 
     if (req.method === "PUT") {
