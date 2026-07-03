@@ -2152,6 +2152,8 @@ function viewerApplyStudent(j){
   const te=document.getElementById("termEarly"),tl=document.getElementById("termLate");
   if(te)te.classList.remove("on");if(tl)tl.classList.add("on");
   pstate.person=latePersons[0].name; // 本人を自動選択
+  switchTab("person"); // 開いた直後から本人の時間割を表示
+  switchTab("person"); // 開いた直後から本人の時間割（学生別タブ）を表示する
 }
 function schedulePush(){
   if(!serverMode)return;
