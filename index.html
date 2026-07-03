@@ -38,6 +38,10 @@
   .integ-badge.ok:hover{background:rgba(255,255,255,.3)}
   .viewer-tag{font-size:.72rem;font-weight:700;padding:4px 12px;border-radius:999px;background:#fff;color:var(--accent);letter-spacing:.05em}
   .app-ver{font-size:.62rem;opacity:.55;color:#fff;letter-spacing:.03em}
+  #syncWarn{background:#c0392b;color:#fff}
+  #syncWarn .wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-top:9px;padding-bottom:9px}
+  #syncWarn #syncWarnMsg{font-size:.82rem;font-weight:600;flex:1;min-width:200px}
+  #syncWarn .btn{background:#fff;color:#c0392b;border:none;font-size:.8rem;padding:6px 14px}
 
   .tabs{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap}
   .tab{font-size:.9rem;font-weight:700;padding:10px 18px;border:1.5px solid var(--line);
@@ -415,10 +419,14 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v3</span>
+  <span class="app-ver">v4</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
+<div id="syncWarn" style="display:none"><div class="wrap">
+  <span id="syncWarnMsg">⚠ サーバーに接続されていません。変更はこの端末にのみ保存され、他の人には共有されません。</span>
+  <button class="btn" id="syncRetryBtn">再接続する</button>
+</div></div>
 
 <div class="wrap">
   <div class="tabs">
@@ -2093,7 +2101,8 @@ async function serverLoad(silent){
         tok=prompt("編集画面を開きます。編集パスワードを入力してください：");
         if(tok){try{sessionStorage.setItem("thl_edit_token",tok);}catch(e){}}
       }
-      if(!tok){serverMode=false;setSaved("⚠ サーバー同期オフ（パスワード未入力・この端末内のみ）");return;}
+      if(!tok){serverMode=false;setSaved("⚠ サーバー同期オフ（パスワード未入力・この端末内のみ）");
+        showSyncWarn("⚠ 編集パスワードが未入力のため、サーバーに接続されていません。変更は共有されません。");return;}
       opts.headers={"x-edit-token":tok};
     }else if(VIEWER_STUDENT_KEY){
       url+="?s="+encodeURIComponent(VIEWER_STUDENT_KEY);
@@ -2103,11 +2112,13 @@ async function serverLoad(silent){
       try{sessionStorage.removeItem("thl_edit_token");}catch(e){}
       serverMode=false;
       alert("編集パスワードが違います。ページを再読み込みして、正しいパスワードを入力してください。");
-      setSaved("⚠ サーバー同期オフ（パスワード不一致）");return;
+      setSaved("⚠ サーバー同期オフ（パスワード不一致）");
+      showSyncWarn("⚠ 編集パスワードが違うため、サーバーに接続されていません。変更は共有されません。");return;
     }
     if(!r.ok)throw new Error("HTTP "+r.status);
     const j=await r.json();
     serverMode=true;
+    hideSyncWarn();
     const btn=document.getElementById("syncReloadBtn");if(btn){btn.style.display="";btn.onclick=()=>serverLoad(false);}
     if(j&&j.exists){
       lateRecords=j.lateRecords||[];
@@ -2132,9 +2143,20 @@ async function serverLoad(silent){
     }
   }catch(e){
     serverMode=false;
+    if(!VIEWER_MODE)showSyncWarn("⚠ サーバーに接続できません。変更はこの端末にのみ保存され、共有されません。");
     if(!silent)alert("サーバーに接続できませんでした。この端末内のデータで表示します。");
   }
 }
+/* 編集画面の未接続警告バナー */
+function showSyncWarn(msg){
+  if(VIEWER_MODE||location.protocol==="file:")return; // 閲覧版・ローカルファイルでは出さない
+  const w=document.getElementById("syncWarn");if(!w)return;
+  document.getElementById("syncWarnMsg").textContent=msg;
+  w.style.display="";
+  const b=document.getElementById("syncRetryBtn");
+  if(b)b.onclick=()=>{try{sessionStorage.removeItem("thl_edit_token");}catch(e){};serverLoad(false);};
+}
+function hideSyncWarn(){const w=document.getElementById("syncWarn");if(w)w.style.display="none";}
 /* 閲覧版：学生キーの結果に応じて学生別タブを出し分ける */
 function viewerApplyStudent(j){
   if(!VIEWER_MODE)return;
