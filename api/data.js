@@ -34,17 +34,19 @@ async function kv(cmd) {
 export default async function handler(req, res) {
   try {
     if (req.method === "GET") {
+      // tokenSet: サーバー側にEDIT_TOKENが設定されているか（診断用。値そのものは返さない）
+      const tokenSet = !!process.env.EDIT_TOKEN;
       // パスワードが添えられている場合は、データの有無より先に必ず照合する
       // （空のときに照合を飛ばすと、誤ったパスワードでも「接続OK」に見えてしまうため）
       const tok = req.headers["x-edit-token"];
       if (tok) {
         if (!(process.env.EDIT_TOKEN && tok === process.env.EDIT_TOKEN)) {
-          return res.status(401).json({ error: "unauthorized" });
+          return res.status(401).json({ error: "unauthorized", tokenSet });
         }
       }
 
       const raw = await kv(["GET", KEY]);
-      if (!raw) return res.status(200).json({ exists: false });
+      if (!raw) return res.status(200).json({ exists: false, tokenSet });
       const data = JSON.parse(raw);
 
       // 1) 編集パスワード付き（照合済み）→ 全データ（学生別を含む）
@@ -85,7 +87,9 @@ export default async function handler(req, res) {
       // 編集パスワードの確認
       const tok = req.headers["x-edit-token"];
       if (!process.env.EDIT_TOKEN || tok !== process.env.EDIT_TOKEN) {
-        return res.status(401).json({ error: "unauthorized" });
+        return res
+          .status(401)
+          .json({ error: "unauthorized", tokenSet: !!process.env.EDIT_TOKEN });
       }
       const body = req.body || {};
 
