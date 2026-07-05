@@ -42,6 +42,25 @@
   #syncWarn .wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-top:9px;padding-bottom:9px}
   #syncWarn #syncWarnMsg{font-size:.82rem;font-weight:600;flex:1;min-width:200px}
   #syncWarn .btn{background:#fff;color:#c0392b;border:none;font-size:.8rem;padding:6px 14px}
+  #editGate{position:fixed;inset:0;z-index:2000;background:linear-gradient(160deg,var(--accent),#0a5570);display:flex;align-items:center;justify-content:center;padding:20px}
+  #editGate .gate-card{background:#fff;border-radius:16px;padding:34px 30px;max-width:380px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);text-align:center}
+  #editGate .gate-title{font-size:1.2rem;font-weight:800;color:var(--accent);margin-bottom:4px}
+  #editGate .gate-sub{font-size:.82rem;color:var(--ink-soft);margin-bottom:18px}
+  #gatePw{width:100%;padding:11px 12px;font-size:16px;border:1.5px solid var(--line);border-radius:9px;margin-bottom:12px}
+  #gatePw:focus{outline:none;border-color:var(--accent)}
+  #gateBtn{width:100%;background:var(--accent);color:#fff;border:none;padding:11px;font-size:.95rem;font-weight:700}
+  #editGate .gate-err{margin-top:12px;font-size:.8rem;color:#c0392b;font-weight:600;line-height:1.5;text-align:left}
+  #editGate .gate-viewer{display:inline-block;margin-top:14px;font-size:.78rem;color:var(--ink-soft)}
+  #lockScreen{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
+  .lock-box{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:34px 30px;max-width:380px;width:100%;text-align:center}
+  .lock-title{font-size:1.15rem;font-weight:800;color:var(--accent);margin-bottom:6px}
+  .lock-title span{display:block;font-size:.82rem;font-weight:700;color:var(--ink-soft);margin-top:2px}
+  .lock-desc{font-size:.84rem;color:var(--ink-soft);margin:10px 0 16px}
+  #lockPw{width:100%;padding:11px 13px;border:1.5px solid var(--line);border-radius:9px;font-size:16px;margin-bottom:10px}
+  #lockPw:focus{outline:none;border-color:var(--accent)}
+  .lock-err{font-size:.78rem;font-weight:700;color:#c0392b;background:#fdf1ef;border:1px solid #f2cfc9;border-radius:8px;padding:8px 10px;margin-bottom:10px;text-align:left}
+  #lockBtn{width:100%;background:var(--accent);color:#fff;border:none;padding:11px;font-size:.92rem}
+  .lock-viewer-link{display:inline-block;margin-top:14px;font-size:.78rem;color:var(--ink-soft)}
 
   .tabs{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap}
   .tab{font-size:.9rem;font-weight:700;padding:10px 18px;border:1.5px solid var(--line);
@@ -419,7 +438,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v7</span>
+  <span class="app-ver">v8</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
@@ -427,6 +446,27 @@
   <span id="syncWarnMsg">⚠ サーバーに接続されていません。変更はこの端末にのみ保存され、他の人には共有されません。</span>
   <button class="btn" id="syncRetryBtn">再接続する</button>
 </div></div>
+<div id="editGate" style="display:none">
+  <div class="gate-card">
+    <div class="gate-title">THL 時間割ツール</div>
+    <div class="gate-sub">編集画面に入るには、編集パスワードが必要です</div>
+    <input type="password" id="gatePw" placeholder="編集パスワード（半角英数字・記号）" autocomplete="current-password">
+    <button class="btn" id="gateBtn">編集画面を開く</button>
+    <div class="gate-err" id="gateErr" style="display:none"></div>
+    <a class="gate-viewer" href="/">閲覧版を開く →</a>
+  </div>
+</div>
+
+<div id="lockScreen" style="display:none">
+  <div class="lock-box">
+    <div class="lock-title">THL 時間割ツール<span>編集画面</span></div>
+    <p class="lock-desc">編集画面に入るには、編集パスワードが必要です。</p>
+    <input type="password" id="lockPw" placeholder="編集パスワード（半角）" autocomplete="off">
+    <div class="lock-err" id="lockErr" style="display:none"></div>
+    <button class="btn" id="lockBtn">編集画面に入る</button>
+    <a class="lock-viewer-link" href="/">閲覧版を開く（パスワード不要）</a>
+  </div>
+</div>
 
 <div class="wrap">
   <div class="tabs">
@@ -2110,12 +2150,7 @@ async function serverLoad(silent){
       // 編集画面：学生データを含む全データの取得にパスワードが必要
       let tok=null;try{tok=sessionStorage.getItem("thl_edit_token");}catch(e){}
       if(tok&&!validEditToken(tok)){tok=null;try{sessionStorage.removeItem("thl_edit_token");}catch(e){}}
-      if(!tok){
-        tok=askEditToken();
-        if(tok){try{sessionStorage.setItem("thl_edit_token",tok);}catch(e){}}
-      }
-      if(!tok){serverMode=false;setSaved("⚠ サーバー同期オフ（パスワード未入力・この端末内のみ）");
-        showSyncWarn("⚠ 編集パスワードが未入力のため、サーバーに接続されていません。変更は共有されません。");return;}
+      if(!tok){serverMode=false;showEditGate("");return;} // 入口ゲートで入力を待つ
       opts.headers={"x-edit-token":tok};
     }else if(VIEWER_STUDENT_KEY){
       url+="?s="+encodeURIComponent(VIEWER_STUDENT_KEY);
@@ -2126,13 +2161,11 @@ async function serverLoad(silent){
       try{sessionStorage.removeItem("thl_edit_token");}catch(e){}
       serverMode=false;
       if(ts===false){
-        alert("サーバー側に編集パスワード（EDIT_TOKEN）が設定されていません。\n\nVercelの Settings → Environment Variables で EDIT_TOKEN を確認し、\n適用先の「Production」にチェックが入っているか確認してください。\n保存後は Deployments から Redeploy が必要です。");
         setSaved("⚠ サーバー同期オフ（EDIT_TOKEN未設定）");
-        showSyncWarn("⚠ サーバー側にEDIT_TOKENが設定されていません。VercelでProductionに適用されているか確認し、Redeployしてください。");
+        showEditGate("サーバー側に編集パスワード（EDIT_TOKEN）が設定されていません。VercelのEnvironment VariablesでProductionに適用されているか確認し、Redeployしてください。");
       }else{
-        alert("編集パスワードが違います。ページを再読み込みして、正しいパスワードを入力してください。");
         setSaved("⚠ サーバー同期オフ（パスワード不一致）");
-        showSyncWarn("⚠ 編集パスワードが違うため、サーバーに接続されていません。変更は共有されません。");
+        showEditGate("パスワードが違います。入力し直してください。");
       }
       return;
     }
@@ -2144,7 +2177,7 @@ async function serverLoad(silent){
     try{j=await r.json();}
     catch(e2){throw new Error("応答がJSONではありません（APIが正しく動いていない可能性）");}
     serverMode=true;
-    hideSyncWarn();
+    hideSyncWarn();hideEditGate();
     const btn=document.getElementById("syncReloadBtn");if(btn){btn.style.display="";btn.onclick=()=>serverLoad(false);}
     if(j&&j.exists){
       lateRecords=j.lateRecords||[];
@@ -2170,8 +2203,13 @@ async function serverLoad(silent){
   }catch(e){
     serverMode=false;
     const why=(e&&e.message)?e.message:String(e);
-    if(!VIEWER_MODE)showSyncWarn("⚠ サーバーに接続できません［原因: "+why+"］変更はこの端末にのみ保存され、共有されません。");
-    if(!silent)alert("サーバーに接続できませんでした。\n\n原因: "+why+"\n\nこの端末内のデータで表示します。");
+    const gateOpen=!VIEWER_MODE&&document.getElementById("editGate")&&document.getElementById("editGate").style.display!=="none";
+    if(gateOpen){
+      showEditGate("サーバーに接続できません（原因: "+why+"）。時間をおいて再試行してください。");
+    }else{
+      if(!VIEWER_MODE)showSyncWarn("⚠ サーバーに接続できません［原因: "+why+"］変更はこの端末にのみ保存され、共有されません。");
+      if(!silent)alert("サーバーに接続できませんでした。\n\n原因: "+why+"\n\nこの端末内のデータで表示します。");
+    }
   }
 }
 /* 編集画面の未接続警告バナー */
@@ -2184,6 +2222,24 @@ function showSyncWarn(msg){
   if(b)b.onclick=()=>{try{sessionStorage.removeItem("thl_edit_token");}catch(e){};serverLoad(false);};
 }
 function hideSyncWarn(){const w=document.getElementById("syncWarn");if(w)w.style.display="none";}
+/* 編集画面の入口ゲート：正しいパスワードを入れるまで編集画面に入れない */
+function showEditGate(msg){
+  if(VIEWER_MODE||location.protocol==="file:")return;
+  const g=document.getElementById("editGate");if(!g)return;
+  g.style.display="";
+  const e=document.getElementById("gateErr");
+  if(msg){e.textContent=msg;e.style.display="";}else{e.style.display="none";}
+  setTimeout(()=>{const i=document.getElementById("gatePw");if(i)i.focus();},50);
+}
+function hideEditGate(){const g=document.getElementById("editGate");if(g)g.style.display="none";
+  const i=document.getElementById("gatePw");if(i)i.value="";}
+function gateSubmit(){
+  const i=document.getElementById("gatePw");const v=(i&&i.value||"").trim();
+  if(!v){showEditGate("パスワードを入力してください。");return;}
+  if(!validEditToken(v)){showEditGate("全角文字が含まれています。IMEをオフにして、半角英数字・記号で入力してください。");return;}
+  try{sessionStorage.setItem("thl_edit_token",v);}catch(e){}
+  serverLoad(false);
+}
 /* 閲覧版：学生キーの結果に応じて学生別タブを出し分ける */
 function viewerApplyStudent(j){
   if(!VIEWER_MODE)return;
@@ -2214,12 +2270,8 @@ async function doPush(){
   let tok=null;
   try{tok=sessionStorage.getItem("thl_edit_token");}catch(e){}
   if(tok&&!validEditToken(tok)){tok=null;try{sessionStorage.removeItem("thl_edit_token");}catch(e){}}
-  if(!tok){
-    tok=askEditToken();
-    if(!tok){setSaved("⚠ サーバー未保存（パスワード未入力）");
-      showSyncWarn("⚠ 編集パスワードが未入力のため、変更はサーバーに保存されていません。");return;}
-    try{sessionStorage.setItem("thl_edit_token",tok);}catch(e){}
-  }
+  if(!tok){setSaved("⚠ サーバー未保存（未認証）");
+    showEditGate("編集内容を保存するには、パスワードを入力してください。");return;}
   try{
     const body={lateRecords,earlyEdits,latePersons,lateP,baseUpdatedAt:serverUpdatedAt};
     const r=await fetch(API_URL,{method:"PUT",
@@ -2229,12 +2281,11 @@ async function doPush(){
       let ts=null;try{const b=await r.json();ts=b?b.tokenSet:null;}catch(e2){}
       try{sessionStorage.removeItem("thl_edit_token");}catch(e){}
       if(ts===false){
-        alert("サーバー側に編集パスワード（EDIT_TOKEN）が設定されていません。\nVercelの環境変数でProductionに適用し、Redeployしてください。\n（保存されていません）");
         setSaved("⚠ サーバー未保存（EDIT_TOKEN未設定）");
-        showSyncWarn("⚠ サーバー側にEDIT_TOKENが設定されていません。VercelでProductionに適用されているか確認し、Redeployしてください。");
+        showEditGate("サーバー側にEDIT_TOKENが設定されていません。Vercelの環境変数を確認してください。（直前の変更は保存されていません）");
       }else{
-        alert("編集パスワードが違います。サーバーには保存されていません。");
         setSaved("⚠ サーバー未保存（パスワード不一致）");
+        showEditGate("パスワードが確認できませんでした（変更された可能性があります）。入力し直してください。（直前の変更は保存されていません）");
       }
       return;
     }
@@ -2259,6 +2310,10 @@ async function doPush(){
     const h1=document.querySelector("#appHeader h1");if(h1)h1.textContent="THL 時間割（閲覧版）";
     // 学生別タブは初期非表示。有効な学生用URL（?s=）のときだけserverLoad後に表示される
     const pt=document.querySelector('.tab[data-tab="person"]');if(pt)pt.style.display="none";
+  }else if(location.protocol!=="file:"){
+    // 編集画面：入口ゲートの配線（Enterキーでも送信）
+    const b=document.getElementById("gateBtn");if(b)b.onclick=gateSubmit;
+    const i=document.getElementById("gatePw");if(i)i.onkeydown=e=>{if(e.key==="Enter")gateSubmit();};
   }
 })();
 
