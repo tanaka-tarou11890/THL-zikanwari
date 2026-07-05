@@ -419,7 +419,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v6</span>
+  <span class="app-ver">v7</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
@@ -2122,11 +2122,19 @@ async function serverLoad(silent){
     }
     const r=await fetch(url,opts);
     if(r.status===401){
+      let ts=null;try{const b=await r.json();ts=b?b.tokenSet:null;}catch(e2){}
       try{sessionStorage.removeItem("thl_edit_token");}catch(e){}
       serverMode=false;
-      alert("編集パスワードが違います。ページを再読み込みして、正しいパスワードを入力してください。");
-      setSaved("⚠ サーバー同期オフ（パスワード不一致）");
-      showSyncWarn("⚠ 編集パスワードが違うため、サーバーに接続されていません。変更は共有されません。");return;
+      if(ts===false){
+        alert("サーバー側に編集パスワード（EDIT_TOKEN）が設定されていません。\n\nVercelの Settings → Environment Variables で EDIT_TOKEN を確認し、\n適用先の「Production」にチェックが入っているか確認してください。\n保存後は Deployments から Redeploy が必要です。");
+        setSaved("⚠ サーバー同期オフ（EDIT_TOKEN未設定）");
+        showSyncWarn("⚠ サーバー側にEDIT_TOKENが設定されていません。VercelでProductionに適用されているか確認し、Redeployしてください。");
+      }else{
+        alert("編集パスワードが違います。ページを再読み込みして、正しいパスワードを入力してください。");
+        setSaved("⚠ サーバー同期オフ（パスワード不一致）");
+        showSyncWarn("⚠ 編集パスワードが違うため、サーバーに接続されていません。変更は共有されません。");
+      }
+      return;
     }
     if(!r.ok){
       let detail="";try{detail=(await r.text()).slice(0,150);}catch(e2){}
@@ -2218,9 +2226,17 @@ async function doPush(){
       headers:{"Content-Type":"application/json","x-edit-token":tok},
       body:JSON.stringify(body)});
     if(r.status===401){
+      let ts=null;try{const b=await r.json();ts=b?b.tokenSet:null;}catch(e2){}
       try{sessionStorage.removeItem("thl_edit_token");}catch(e){}
-      alert("編集パスワードが違います。サーバーには保存されていません。");
-      setSaved("⚠ サーバー未保存（パスワード不一致）");return;
+      if(ts===false){
+        alert("サーバー側に編集パスワード（EDIT_TOKEN）が設定されていません。\nVercelの環境変数でProductionに適用し、Redeployしてください。\n（保存されていません）");
+        setSaved("⚠ サーバー未保存（EDIT_TOKEN未設定）");
+        showSyncWarn("⚠ サーバー側にEDIT_TOKENが設定されていません。VercelでProductionに適用されているか確認し、Redeployしてください。");
+      }else{
+        alert("編集パスワードが違います。サーバーには保存されていません。");
+        setSaved("⚠ サーバー未保存（パスワード不一致）");
+      }
+      return;
     }
     if(r.status===409){
       alert("他の人が先にデータを更新しました。\n最新のデータを読み込み直します。\n（直前のあなたの変更はサーバーに保存されていません）");
