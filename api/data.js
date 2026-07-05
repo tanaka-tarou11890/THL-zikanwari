@@ -34,17 +34,22 @@ async function kv(cmd) {
 export default async function handler(req, res) {
   try {
     if (req.method === "GET") {
+      // パスワードが添えられている場合は、データの有無より先に必ず照合する
+      // （空のときに照合を飛ばすと、誤ったパスワードでも「接続OK」に見えてしまうため）
+      const tok = req.headers["x-edit-token"];
+      if (tok) {
+        if (!(process.env.EDIT_TOKEN && tok === process.env.EDIT_TOKEN)) {
+          return res.status(401).json({ error: "unauthorized" });
+        }
+      }
+
       const raw = await kv(["GET", KEY]);
       if (!raw) return res.status(200).json({ exists: false });
       const data = JSON.parse(raw);
 
-      // 1) 編集パスワード付き → 全データ（学生別を含む）
-      const tok = req.headers["x-edit-token"];
+      // 1) 編集パスワード付き（照合済み）→ 全データ（学生別を含む）
       if (tok) {
-        if (process.env.EDIT_TOKEN && tok === process.env.EDIT_TOKEN) {
-          return res.status(200).json({ exists: true, ...data });
-        }
-        return res.status(401).json({ error: "unauthorized" });
+        return res.status(200).json({ exists: true, ...data });
       }
 
       // 2) 学生キー付き（?s=XXXX）→ クラス時間割 + 本人の学生データのみ
