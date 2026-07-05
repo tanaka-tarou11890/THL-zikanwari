@@ -419,7 +419,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v5</span>
+  <span class="app-ver">v6</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
@@ -2128,8 +2128,13 @@ async function serverLoad(silent){
       setSaved("⚠ サーバー同期オフ（パスワード不一致）");
       showSyncWarn("⚠ 編集パスワードが違うため、サーバーに接続されていません。変更は共有されません。");return;
     }
-    if(!r.ok)throw new Error("HTTP "+r.status);
-    const j=await r.json();
+    if(!r.ok){
+      let detail="";try{detail=(await r.text()).slice(0,150);}catch(e2){}
+      throw new Error("HTTP "+r.status+(detail?"："+detail:""));
+    }
+    let j;
+    try{j=await r.json();}
+    catch(e2){throw new Error("応答がJSONではありません（APIが正しく動いていない可能性）");}
     serverMode=true;
     hideSyncWarn();
     const btn=document.getElementById("syncReloadBtn");if(btn){btn.style.display="";btn.onclick=()=>serverLoad(false);}
@@ -2156,8 +2161,9 @@ async function serverLoad(silent){
     }
   }catch(e){
     serverMode=false;
-    if(!VIEWER_MODE)showSyncWarn("⚠ サーバーに接続できません。変更はこの端末にのみ保存され、共有されません。");
-    if(!silent)alert("サーバーに接続できませんでした。この端末内のデータで表示します。");
+    const why=(e&&e.message)?e.message:String(e);
+    if(!VIEWER_MODE)showSyncWarn("⚠ サーバーに接続できません［原因: "+why+"］変更はこの端末にのみ保存され、共有されません。");
+    if(!silent)alert("サーバーに接続できませんでした。\n\n原因: "+why+"\n\nこの端末内のデータで表示します。");
   }
 }
 /* 編集画面の未接続警告バナー */
