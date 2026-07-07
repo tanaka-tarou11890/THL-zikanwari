@@ -37,6 +37,17 @@
   .integ-badge.warn:hover{background:#fff5ef}
   .integ-badge.ok:hover{background:rgba(255,255,255,.3)}
   .viewer-tag{font-size:.72rem;font-weight:700;padding:4px 12px;border-radius:999px;background:#fff;color:var(--accent);letter-spacing:.05em}
+  .year-badge{font-size:.78rem;font-weight:700;padding:4px 12px;border-radius:999px;background:rgba(255,255,255,.9);color:var(--accent);white-space:nowrap}
+  .ym-overlay{position:fixed;inset:0;z-index:2100;background:rgba(20,30,45,.5);display:none;align-items:center;justify-content:center;padding:20px}
+  .ym-overlay.show{display:flex}
+  .ym-card{background:#fff;border-radius:16px;padding:26px 24px;max-width:460px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);max-height:90vh;overflow:auto}
+  .ym-card h3{font-size:1.1rem;color:var(--accent);margin-bottom:4px}
+  .ym-card .ym-sub{font-size:.8rem;color:var(--ink-soft);margin-bottom:18px}
+  .ym-sec{border:1px solid var(--line);border-radius:11px;padding:14px;margin-bottom:12px}
+  .ym-sec .ym-t{font-size:.9rem;font-weight:700;margin-bottom:4px}
+  .ym-sec .ym-d{font-size:.78rem;color:var(--ink-soft);margin-bottom:10px;line-height:1.5}
+  .ym-sec .ym-row{display:flex;gap:8px;flex-wrap:wrap}
+  .ym-card .ym-close{display:block;width:100%;margin-top:6px;background:var(--line-soft);color:var(--ink);border:none;padding:10px;border-radius:9px;font-weight:600}
   .app-ver{font-size:.62rem;opacity:.55;color:#fff;letter-spacing:.03em}
   #syncWarn{background:#c0392b;color:#fff}
   #syncWarn .wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-top:9px;padding-bottom:9px}
@@ -431,6 +442,7 @@
 <body>
 <header id="appHeader"><div class="wrap">
   <h1>THL 時間割ツール</h1>
+  <span class="year-badge" id="yearBadge"></span>
   <div class="term-toggle">
     <button id="termEarly" class="on">前期</button>
     <button id="termLate">後期</button>
@@ -438,7 +450,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v8</span>
+  <span class="app-ver">v9</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
@@ -454,6 +466,35 @@
     <button class="btn" id="gateBtn">編集画面を開く</button>
     <div class="gate-err" id="gateErr" style="display:none"></div>
     <a class="gate-viewer" href="/">閲覧版を開く →</a>
+  </div>
+</div>
+<div class="ym-overlay" id="yearMenu">
+  <div class="ym-card">
+    <h3>年度メニュー</h3>
+    <div class="ym-sub">現在の年度：<b id="ymCurrent"></b></div>
+    <div class="ym-sec">
+      <div class="ym-t">① 今年度のデータを書き出す（バックアップ）</div>
+      <div class="ym-d">新年度に切り替える前に、必ず書き出して保管してください。前期・後期・学生別をまとめて1つのJSONに保存します。</div>
+      <div class="ym-row">
+        <button class="btn ok" id="ymExportJson">年度データをJSON書き出し</button>
+      </div>
+    </div>
+    <div class="ym-sec">
+      <div class="ym-t">② 新年度を作成する</div>
+      <div class="ym-d">今年度を土台に新年度（＋1年）を作ります。クラス時間割（前期・後期）はコピーされ、学生別の個別時間割は空になります。<b>この操作は元に戻せません。</b>先に①で書き出しておいてください。</div>
+      <div class="ym-row">
+        <button class="btn edit" id="ymNewCopy">前年度をコピーして新年度</button>
+        <button class="btn ghost" id="ymNewEmpty">空の新年度を作成</button>
+      </div>
+    </div>
+    <div class="ym-sec">
+      <div class="ym-t">③ 保存した年度データを読み込む</div>
+      <div class="ym-d">①で書き出したJSONを読み込んで、その年度の状態に復元します（現在のデータは置き換わります）。</div>
+      <div class="ym-row">
+        <button class="btn ghost" id="ymImportJson">年度データを読み込む</button>
+      </div>
+    </div>
+    <button class="ym-close" id="ymClose">閉じる</button>
   </div>
 </div>
 
@@ -616,6 +657,12 @@
 var VIEWER_MODE=(location.protocol!=="file:")&&(location.pathname.indexOf("/edit")===-1)&&(location.search.indexOf("edit")===-1);
 /* 閲覧版の学生用キー（?s=XXXX）。あれば学生別タブに本人の時間割だけを表示する */
 var VIEWER_STUDENT_KEY=(function(){try{const m=location.search.match(/[?&]s=([a-z0-9]+)/i);return m?m[1]:null;}catch(e){return null;}})();
+/* 年度（例：2026）。サーバーに保存され、書き出し・新年度作成の単位になる */
+let schoolYear=(function(){try{const s=localStorage.getItem("thl_year_v1");if(s)return parseInt(s,10);}catch(e){}
+  // 初期値：4月以降はその年、1〜3月は前年を年度とする
+  const now=new Date();return now.getMonth()>=3?now.getFullYear():now.getFullYear()-1;})();
+function saveYearLocal(){try{localStorage.setItem("thl_year_v1",String(schoolYear));}catch(e){}}
+function updateYearBadge(){const el=document.getElementById("yearBadge");if(el)el.textContent=schoolYear+"年度";}
 /* 学生キーの発行（ランダム12文字。URL判定と衝突しないよう "edit" を含む場合は作り直し） */
 function genKey(){const cs="abcdefghijklmnopqrstuvwxyz0123456789";let s="";
   do{s="";try{const a=new Uint8Array(12);crypto.getRandomValues(a);for(let i=0;i<12;i++)s+=cs[a[i]%36];}
@@ -666,34 +713,39 @@ function updateIntegBadge(){
 // 前期の編集差分（元データGENは保持し、差分だけ別保存していつでも戻せる）
 // edits[key] = {type:"edit"|"delete", data:{...}} ／ key = grade|world|day|period
 const STORE_EEDIT="thl_zenki_edits_v1";
-let earlyEdits={};
-function loadEarlyEdits(){try{const s=localStorage.getItem(STORE_EEDIT);if(s)earlyEdits=JSON.parse(s);}catch(e){earlyEdits={};}}
-function saveEarlyEdits(){try{localStorage.setItem(STORE_EEDIT,JSON.stringify(earlyEdits));
-  setSaved("前期 編集を保存 "+new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}));}catch(e){}
-  schedulePush();}
-loadEarlyEdits();
-function earlyEditCount(){return Object.keys(earlyEdits).length;}
-// GENに編集差分を適用した「表示用の前期データ」を生成
-function earlyData(){
+let earlyRecords=[];        // 前期クラス時間割（初回はGENから生成、以降は直接編集）
+let earlyEdits={};          // 後方互換（旧データ移行用。現在は未使用）
+function loadEarlyEdits(){
+  try{
+    const sNew=localStorage.getItem("thl_zenki_records_v1");
+    if(sNew){earlyRecords=JSON.parse(sNew);return;}
+  }catch(e){}
+  try{const s=localStorage.getItem(STORE_EEDIT);if(s)earlyEdits=JSON.parse(s);}catch(e){earlyEdits={};}
+  earlyRecords=buildEarlyFromGen();
+}
+function buildEarlyFromGen(){
   const keyOf=r=>[r.grade,r.world,r.day,r.period].join("|");
   const out=[];
-  // 編集差分のあるキーは差分を優先、ないキーはGENをそのまま
-  const editedKeys=new Set(Object.keys(earlyEdits));
+  const editedKeys=new Set(Object.keys(earlyEdits||{}));
   const genByKey={};
   GEN.forEach(r=>{const k=keyOf(r);(genByKey[k]=genByKey[k]||[]).push(r);});
-  // GEN由来（編集が無い枠）
   Object.keys(genByKey).forEach(k=>{
-    if(editedKeys.has(k))return; // 編集ありは後でまとめて出す
-    genByKey[k].forEach(r=>out.push(r));
+    if(editedKeys.has(k))return;
+    genByKey[k].forEach(r=>out.push(Object.assign({},r)));
   });
-  // 編集差分のある枠
   editedKeys.forEach(k=>{const e=earlyEdits[k];
-    if(e.type==="delete")return;
+    if(!e||e.type==="delete")return;
     if(e.type==="edit")out.push(e.data);
     else if(e.type==="editMulti")e.list.forEach(r=>out.push(r));
   });
   return out;
 }
+function saveEarlyEdits(){try{localStorage.setItem("thl_zenki_records_v1",JSON.stringify(earlyRecords));
+  setSaved("前期 保存 "+new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}));}catch(e){}
+  schedulePush();}
+loadEarlyEdits();
+function earlyEditCount(){return earlyRecords.length;}
+function earlyData(){return earlyRecords;}
 let earlyEditMode=false; // 前期で編集モードがONか
 
 // 現在データ（学期で切替）
@@ -1032,13 +1084,12 @@ function renderEditToolbar(){
       <button class="btn ${earlyEditMode?'edit':'ghost'}" id="toggleEarlyEdit" style="margin-left:auto">${earlyEditMode?'編集を終了':'編集する'}</button>
       <button class="btn ghost" id="checkAll">整合チェック</button>
       <button class="btn ok" id="exportEarlyXlsx">Excel出力</button>
-      ${cnt?`<button class="btn danger-ghost" id="resetEarly">元のデータに戻す</button>`:''}
+      <button class="btn ghost" id="yearMenuBtnE">年度メニュー</button>
     </div><div id="progressPanel"></div><div id="checkPanel"></div>`;
     document.getElementById("toggleEarlyEdit").onclick=()=>{earlyEditMode=!earlyEditMode;renderClass();};
     document.getElementById("exportEarlyXlsx").onclick=exportEarlyExcel;
     document.getElementById("checkAll").onclick=()=>{checkOpen=!checkOpen;if(checkOpen)progressOpen=false;renderProgress();renderCheck();};
-    const re=document.getElementById("resetEarly");
-    if(re)re.onclick=()=>{if(confirm("前期に加えた編集をすべて取り消し、元のデータ（読み込んだExcelの内容）に戻します。よろしいですか？")){earlyEdits={};saveEarlyEdits();renderClass();}};
+    const ym=document.getElementById("yearMenuBtnE");if(ym)ym.onclick=openYearMenu;
     renderCheck();
     return;
   }
@@ -1051,12 +1102,14 @@ function renderEditToolbar(){
     <button class="btn ok" id="exportXlsx">Excel出力</button>
     <button class="btn ghost" id="exportJson">JSON出力</button>
     <button class="btn ghost" id="importJson">JSON読込</button>
+    <button class="btn ghost" id="yearMenuBtnL">年度メニュー</button>
     <button class="btn danger-ghost" id="resetLate">後期データを消去</button>
   </div><div id="progressPanel"></div><div id="checkPanel"></div>`;
   document.getElementById("exportXlsx").onclick=exportExcel;
   document.getElementById("exportJson").onclick=exportJson;
   document.getElementById("importJson").onclick=importClassJson;
   document.getElementById("resetLate").onclick=()=>{if(confirm("後期に登録したデータをすべて消去します。よろしいですか？")){lateRecords=[];saveLate();renderClass();}};
+  const ymL=document.getElementById("yearMenuBtnL");if(ymL)ymL.onclick=openYearMenu;
   document.getElementById("toggleProgress").onclick=()=>{progressOpen=!progressOpen;if(progressOpen)checkOpen=false;renderProgress();renderCheck();};
   document.getElementById("checkAll").onclick=()=>{checkOpen=!checkOpen;if(checkOpen)progressOpen=false;renderProgress();renderCheck();};
   document.getElementById("printClass").onclick=()=>printTimetable("class");
@@ -1484,16 +1537,9 @@ function saveCellRecords(grade,wShort,day,period,recs){
     norm.forEach(r=>lateRecords.push(r));
     saveLate();
   }else{
-    const key=[grade,wfull,day,period].join("|");
-    if(norm.length===0){
-      // 空にする＝元データにあるなら削除差分、なければ差分削除
-      const inGen=GEN.some(r=>r.grade===grade&&r.world===wfull&&r.day===day&&r.period===period);
-      if(inGen)earlyEdits[key]={type:"delete"};else delete earlyEdits[key];
-    }else{
-      // 複数件は data に配列を持たせる（type:"editMulti"）。1件は従来通り type:"edit"
-      if(norm.length===1)earlyEdits[key]={type:"edit",data:norm[0]};
-      else earlyEdits[key]={type:"editMulti",list:norm};
-    }
+    // 前期も後期と同じく配列を直接操作（該当枠を全削除→入れ直し）
+    earlyRecords=earlyRecords.filter(r=>!(r.grade===grade&&worldShortFull(r.world)===wShort&&r.day===day&&r.period===period));
+    norm.forEach(r=>earlyRecords.push(r));
     saveEarlyEdits();
   }
 }
@@ -2130,6 +2176,84 @@ function renderAll(){
   rebuildWorldChips();rebuildPersonPick();rebuildRoomPick();
   renderClass();renderPerson();renderFree();renderSlot();renderRoom();
 }
+/* ========== 年度メニュー ========== */
+function openYearMenu(){
+  const ov=document.getElementById("yearMenu");if(!ov)return;
+  const cur=document.getElementById("ymCurrent");if(cur)cur.textContent=schoolYear+"年度";
+  ov.classList.add("show");
+}
+function closeYearMenu(){const ov=document.getElementById("yearMenu");if(ov)ov.classList.remove("show");}
+function ymExport(){
+  const data={year:schoolYear,earlyRecords,lateRecords,latePersons,lateP,exportedAt:new Date().toISOString()};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);
+  a.download="THL時間割_"+schoolYear+"年度_"+new Date().toLocaleDateString("ja-JP").replace(/\//g,"")+".json";a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+function ymNewYear(copy){
+  const next=schoolYear+1;
+  const msg=copy
+    ?`${schoolYear}年度をコピーして ${next}年度 を作成します。\n・クラス時間割（前期・後期）は引き継がれます\n・学生別の個別時間割は空になります\n\nこの操作は元に戻せません。先に「書き出し」でバックアップしましたか？`
+    :`空の ${next}年度 を作成します。\n・前期・後期・学生別のすべてが空になります\n\nこの操作は元に戻せません。先に「書き出し」でバックアップしましたか？`;
+  if(!confirm(msg))return;
+  if(copy){
+    // クラス時間割はディープコピーで引き継ぎ、学生別は空に
+    earlyRecords=JSON.parse(JSON.stringify(earlyRecords));
+    lateRecords=JSON.parse(JSON.stringify(lateRecords));
+  }else{
+    earlyRecords=[];lateRecords=[];
+  }
+  latePersons=[];lateP=[];
+  schoolYear=next;saveYearLocal();
+  // ローカル保存
+  try{
+    localStorage.setItem("thl_zenki_records_v1",JSON.stringify(earlyRecords));
+    localStorage.setItem(STORE_KEY,JSON.stringify(lateRecords));
+    localStorage.setItem(STORE_PKEY,JSON.stringify(latePersons));
+    localStorage.setItem(STORE_PREC,JSON.stringify(lateP));
+  }catch(e){}
+  updateYearBadge();renderAll();closeYearMenu();
+  schedulePush(); // サーバーへ反映
+  setSaved(next+"年度を作成しました");
+  alert(next+"年度を作成しました。内容を確認し、必要なら編集してください。\n（サーバーにも保存されます）");
+}
+function ymImport(){
+  const inp=document.createElement("input");inp.type="file";inp.accept=".json,application/json";
+  inp.onchange=()=>{const f=inp.files&&inp.files[0];if(!f)return;
+    const reader=new FileReader();
+    reader.onload=()=>{
+      try{
+        const d=JSON.parse(reader.result);
+        if(!confirm("読み込んだデータで現在の内容を置き換えます。よろしいですか？"))return;
+        if(typeof d.year==="number"){schoolYear=d.year;saveYearLocal();}
+        earlyRecords=Array.isArray(d.earlyRecords)?d.earlyRecords:[];
+        lateRecords=Array.isArray(d.lateRecords)?d.lateRecords:[];
+        latePersons=Array.isArray(d.latePersons)?d.latePersons:[];
+        lateP=Array.isArray(d.lateP)?d.lateP:[];
+        try{
+          localStorage.setItem("thl_zenki_records_v1",JSON.stringify(earlyRecords));
+          localStorage.setItem(STORE_KEY,JSON.stringify(lateRecords));
+          localStorage.setItem(STORE_PKEY,JSON.stringify(latePersons));
+          localStorage.setItem(STORE_PREC,JSON.stringify(lateP));
+        }catch(e){}
+        updateYearBadge();renderAll();closeYearMenu();
+        schedulePush();
+        setSaved(schoolYear+"年度データを読み込みました");
+        alert(schoolYear+"年度のデータを読み込みました。");
+      }catch(e){alert("JSONの読み込みに失敗しました。ファイルを確認してください。");}
+    };
+    reader.onerror=()=>alert("ファイルの読み込みに失敗しました。");
+    reader.readAsText(f);};
+  inp.click();
+}
+(function wireYearMenu(){
+  const cl=document.getElementById("ymClose");if(cl)cl.onclick=closeYearMenu;
+  const ov=document.getElementById("yearMenu");if(ov)ov.onclick=e=>{if(e.target.id==="yearMenu")closeYearMenu();};
+  const ex=document.getElementById("ymExportJson");if(ex)ex.onclick=ymExport;
+  const nc=document.getElementById("ymNewCopy");if(nc)nc.onclick=()=>ymNewYear(true);
+  const ne=document.getElementById("ymNewEmpty");if(ne)ne.onclick=()=>ymNewYear(false);
+  const im=document.getElementById("ymImportJson");if(im)im.onclick=ymImport;
+})();
 /* 編集パスワードの形式チェック：全角文字は通信ヘッダーに載せられず送信エラーになる */
 function validEditToken(t){return t&&!(/[^\x21-\x7E]/.test(t));}
 function askEditToken(){
@@ -2181,15 +2305,18 @@ async function serverLoad(silent){
     const btn=document.getElementById("syncReloadBtn");if(btn){btn.style.display="";btn.onclick=()=>serverLoad(false);}
     if(j&&j.exists){
       lateRecords=j.lateRecords||[];
+      if(Array.isArray(j.earlyRecords))earlyRecords=j.earlyRecords; // 前期もサーバー管理
       earlyEdits=j.earlyEdits||{};
+      if(typeof j.year==="number"){schoolYear=j.year;saveYearLocal();}
       latePersons=j.latePersons||[];lateP=j.lateP||[];
       serverUpdatedAt=j.updatedAt||null;
+      updateYearBadge();
       // 編集画面：キー未発行の学生がいれば発行してサーバーに反映
       if(!VIEWER_MODE){const added=ensureStudentKeys();if(added)saveLateP();}
       // ローカルにもキャッシュ（オフライン時の保険。閲覧版はキャッシュしない）
       if(!VIEWER_MODE){try{
         localStorage.setItem(STORE_KEY,JSON.stringify(lateRecords));
-        localStorage.setItem(STORE_EEDIT,JSON.stringify(earlyEdits));
+        localStorage.setItem("thl_zenki_records_v1",JSON.stringify(earlyRecords));
         localStorage.setItem(STORE_PKEY,JSON.stringify(latePersons));
         localStorage.setItem(STORE_PREC,JSON.stringify(lateP));
       }catch(e){}}
@@ -2273,7 +2400,7 @@ async function doPush(){
   if(!tok){setSaved("⚠ サーバー未保存（未認証）");
     showEditGate("編集内容を保存するには、パスワードを入力してください。");return;}
   try{
-    const body={lateRecords,earlyEdits,latePersons,lateP,baseUpdatedAt:serverUpdatedAt};
+    const body={year:schoolYear,lateRecords,earlyRecords,latePersons,lateP,baseUpdatedAt:serverUpdatedAt};
     const r=await fetch(API_URL,{method:"PUT",
       headers:{"Content-Type":"application/json","x-edit-token":tok},
       body:JSON.stringify(body)});
@@ -2320,6 +2447,7 @@ async function doPush(){
 /* ========== 初期化 ========== */
 rebuildWorldChips();rebuildPersonPick();
 rebuildRoomPick();
+updateYearBadge();
 renderClass();renderPerson();renderFree();renderSlot();renderRoom();
 serverLoad(true); // サーバーがあれば共有データを読み込む（無ければローカルのまま）
 </script>
