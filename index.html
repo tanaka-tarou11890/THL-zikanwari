@@ -450,7 +450,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v9</span>
+  <span class="app-ver">v10</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
@@ -580,7 +580,7 @@
     <div class="mfield"><label>科目名</label><div class="sg-wrap"><input id="mSubject" placeholder="入力すると候補が出ます" autocomplete="off"><div class="sg-list" id="sgSubject"></div></div></div>
     <div id="copyArea" class="copy-area" style="display:none"></div>
     <div class="mfield"><label>教員</label><div class="sg-wrap"><input id="mTeacher" placeholder="入力すると候補が出ます" autocomplete="off"><div class="sg-list" id="sgTeacher"></div></div></div>
-    <div class="mfield"><label>教室</label><div class="sg-wrap"><input id="mRoom" placeholder="入力すると候補が出ます" autocomplete="off"><div class="sg-list" id="sgRoom"></div></div></div>
+    <div class="mfield"><label>教室</label><div class="sg-wrap"><input id="mRoom" placeholder="入力で候補表示（「・」区切りで複数可）" autocomplete="off"><div class="sg-list" id="sgRoom"></div></div></div>
     <div id="freeRoomArea" class="freeroom-area" style="display:none"></div>
     <div id="conflictArea" class="conflict-area" style="display:none"></div>
     <div class="mfield"><label>備考</label><input id="mNote" placeholder="（任意）" autocomplete="off"></div>
@@ -962,13 +962,22 @@ function updateFreeRooms(){
   const cur=document.getElementById("mRoom").value.trim();
   function chip(rm){const on=normRooms(cur).includes(rm);
     return `<span class="fr-chip${on?' on':''}${roomCat(rm)==='special'?' special':''}" data-room="${esc(rm)}">${esc(rm)}</span>`;}
-  let html=`<div class="fr-head">${day}曜${period}限に空いている教室 <span class="fr-sub">クリックで入力</span></div>`;
+  let html=`<div class="fr-head">${day}曜${period}限に空いている教室 <span class="fr-sub">クリックで追加／解除（複数可）</span></div>`;
   if(freeNormal.length)html+=`<div class="fr-list">${freeNormal.map(chip).join("")}</div>`;
   else html+=`<div class="fr-none">空いている一般教室はありません</div>`;
   if(freeSpecial.length)html+=`<div class="fr-list" style="margin-top:5px">${freeSpecial.map(chip).join("")}</div>`;
   area.innerHTML=html;area.style.display="";
   area.querySelectorAll(".fr-chip").forEach(c=>c.onclick=()=>{
-    document.getElementById("mRoom").value=c.dataset.room;
+    const inp=document.getElementById("mRoom");
+    const rm=c.dataset.room;
+    const parts=protectSplit(inp.value);
+    if(normRooms(inp.value).includes(rm)){
+      // 解除：そのトークンを除去
+      inp.value=parts.filter(p=>{const n=normRooms(p);return !(n.length===1&&n[0]===rm);}).join("・");
+    }else{
+      // 追加：「・」区切りで末尾に追加
+      inp.value=parts.concat([rm]).join("・");
+    }
     updateConflict();updateFreeRooms();});
 }
 function updateConflict(){
@@ -1870,9 +1879,24 @@ function exportPersonJson(){
 /* ========== 空き教室タブ ========== */
 const fstate={day:null,period:null};
 function roomCat(rm){return SPECIAL_ROOMS.includes(rm)?"special":"normal";}
-function normRooms(rm){const ALIAS={"エアラインルーム":"エアーラインルーム","403・404":"403・4","カフェ":"1Fカフェ"};
-  const out=[];(rm||"").split(/[/／]/).forEach(part=>{part=part.trim().replace(/^[A-Za-z0-9]+[：:]/,"").replace(/\s*【.*?】/,"").trim();
-    if(part&&ROOMS.includes(ALIAS[part]||part))out.push(ALIAS[part]||part);});return out;}
+const ROOM_ALIAS={"エアラインルーム":"エアーラインルーム","403・404":"403・4","カフェ":"1Fカフェ"};
+/* 教室文字列を「、」「,」「・」「/」「／」区切りで分解して正規化する。
+   「403・4」のように区切り文字を含む既知の教室名は、先に退避してから分割する */
+function protectSplit(str){
+  let s=(str||"");const prot=[];let pi=0;
+  ROOMS.concat(Object.keys(ROOM_ALIAS)).forEach(name=>{
+    if(/[、,・/／]/.test(name)&&s.indexOf(name)!==-1){const ph="\u0001"+(pi++)+"\u0001";prot.push([ph,name]);s=s.split(name).join(ph);}
+  });
+  return s.split(/[、,・/／]/).map(p=>{prot.forEach(pr=>{p=p.split(pr[0]).join(pr[1]);});return p.trim();}).filter(Boolean);
+}
+function normRooms(rm){
+  const out=[];
+  protectSplit(rm).forEach(part=>{
+    part=part.replace(/^[A-Za-z0-9]+[：:]/,"").replace(/\s*【.*?】/,"").trim();
+    const n=ROOM_ALIAS[part]||part;
+    if(part&&ROOMS.includes(n)&&out.indexOf(n)===-1)out.push(n);
+  });
+  return out;}
 function roomUsage(grade){const use={};ROOMS.forEach(rm=>use[rm]={});
   classData().forEach(r=>{if(grade&&r.grade!==grade)return;normRooms(r.room).forEach(rm=>{
     (use[rm][r.day+"-"+r.period]=use[rm][r.day+"-"+r.period]||[]).push(r);});});return use;}
