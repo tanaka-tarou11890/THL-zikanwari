@@ -58,7 +58,9 @@ export default async function handler(req, res) {
       const sKey = req.query && req.query.s ? String(req.query.s) : null;
       const base = {
         exists: true,
+        year: typeof data.year === "number" ? data.year : null,
         lateRecords: data.lateRecords || [],
+        earlyRecords: data.earlyRecords || [],
         earlyEdits: data.earlyEdits || {},
         updatedAt: data.updatedAt || null,
       };
@@ -105,7 +107,12 @@ export default async function handler(req, res) {
 
       const updatedAt = new Date().toISOString();
       const data = {
+        year:
+          typeof body.year === "number"
+            ? body.year
+            : parseInt(body.year, 10) || null,
         lateRecords: Array.isArray(body.lateRecords) ? body.lateRecords : [],
+        earlyRecords: Array.isArray(body.earlyRecords) ? body.earlyRecords : [],
         earlyEdits:
           body.earlyEdits && typeof body.earlyEdits === "object"
             ? body.earlyEdits
