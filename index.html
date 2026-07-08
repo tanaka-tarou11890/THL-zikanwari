@@ -143,7 +143,7 @@
   table.week.e td.slot.draggable:active{cursor:grabbing}
   table.week.e td.slot.dragging{opacity:.4}
   table.week.e td.slot.drop-target{background:var(--edit-soft)!important;box-shadow:inset 0 0 0 2px var(--edit)}
-  /* 選択科目 */
+  /* 複数授業（1枠に複数の授業） */
   .elective-tag{font-size:.62rem;font-weight:700;color:#fff;background:var(--g3);padding:1px 7px;border-radius:5px;display:inline-block;margin-bottom:5px}
   td.slot.elective{background:#faf7fd}
   .cell-list{background:var(--line-soft);border:1px solid var(--line);border-radius:10px;padding:11px 12px;margin-bottom:14px}
@@ -450,7 +450,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v10</span>
+  <span class="app-ver">v11</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
@@ -1028,9 +1028,9 @@ function buildGrid(rows,q,opts){opts=opts||{};
     let tds=cols.map(d=>{const cell=map[d+"-"+p];const isNow=(d===NOW.day&&p===NOW.period);const nc=isNow?" nowcell":"";
       const attr=editable?` data-d="${d}" data-p="${p}"${gAttr}`:"";
       if(!cell)return editable?`<td class="slot empty${nc}"${attr}><div class="slot-empty-mark">＋</div></td>`:`<td class="slot empty${nc}"></td>`;
-      // 1枠に2件以上＝選択科目として「選択」ラベルを付ける
+      // 1枠に2件以上＝「複数授業」ラベルを付ける（選択科目・クラス分け・合同など）
       const multi=cell.length>1;
-      const inner=(multi?'<div class="elective-tag">選択科目</div>':"")+cell.map(r=>slotCardHTML(r,q)).join("");
+      const inner=(multi?'<div class="elective-tag">複数授業</div>':"")+cell.map(r=>slotCardHTML(r,q)).join("");
       return `<td class="slot${nc}${multi?' elective':''}"${attr}>`+inner+'</td>';
     }).join("");
     return `<tr><td class="period-cell">${p}限<span class="ptime">${time}</span></td>${tds}</tr>`;
@@ -1174,14 +1174,14 @@ function runIntegrityCheck(){
   Object.keys(bySlot).forEach(k=>{
     const recs=bySlot[k];const [day,period]=k.split("-");
     const cellKey=r=>[r.grade,r.world].join("|"); // 同じ枠（学年×ワールド）の識別
-    // 教室重複：教室→[レコード]。同名科目は合同。同じ枠内（選択科目）は除外
+    // 教室重複：教室→[レコード]。同名科目は合同。同じ枠内（複数授業）は除外
     const roomMap={};
     recs.forEach(r=>{normRooms(r.room).forEach(rm=>{(roomMap[rm]=roomMap[rm]||[]).push(r);});});
     Object.keys(roomMap).forEach(rm=>{
       const list=roomMap[rm];
       const subjects=[...new Set(list.map(r=>r.subject))];
       const cells=[...new Set(list.map(cellKey))];
-      // 別々の枠で、2種類以上の科目が同教室＝重複（同じ枠だけなら選択科目なので除外）
+      // 別々の枠で、2種類以上の科目が同教室＝重複（同じ枠内の複数授業は除外）
       if(subjects.length>1&&cells.length>1){
         roomClashes.push({day,period:+period,room:rm,items:list.map(r=>({grade:r.grade,world:worldShortFull(r.world),subject:r.subject,teacher:r.teacher}))});
       }
@@ -1529,7 +1529,7 @@ document.getElementById("clearBtn").onclick=()=>{Object.assign(cstate,{q:"",grad
 
 /* ========== 編集モーダル ========== */
 let editing=null;
-// 枠内の全授業を取得（選択科目だと複数件）
+// 枠内の全授業を取得（複数授業だと複数件）
 function cellRecords(g,wShort,d,p){
   return classData().filter(r=>r.grade===g&&worldShortFull(r.world)===wShort&&r.day===d&&r.period===p);
 }
@@ -1565,7 +1565,7 @@ function deleteCellRecord(grade,wShort,day,period){
 function editGrade(){return (editing&&editing.grade!=null)?editing.grade:cstate.grade;}
 function openModal(d,p,grade){
   const g=(grade!=null)?grade:cstate.grade;
-  // 枠内の全授業を読み込む（選択科目なら複数）
+  // 枠内の全授業を読み込む（複数授業なら複数）
   const recs=cellRecords(g,cstate.world,d,p).map(r=>({subject:r.subject,teacher:r.teacher||"",room:r.room||"",note:r.note||""}));
   editing={day:d,period:p,grade:g,recs:recs,idx:recs.length?0:-1};
   document.getElementById("mSlot").textContent=`${g}年 ${cstate.world} ／ ${d}曜 ${p}限（${PTIME_FULL[p]}）`;
@@ -1578,7 +1578,7 @@ function openModal(d,p,grade){
   setTimeout(()=>document.getElementById("mSubject").focus(),50);}
 function loadFormFromEditing(){
   const r=(editing.idx>=0)?editing.recs[editing.idx]:null;
-  document.getElementById("mTitle").textContent=r?"授業を編集":(editing.recs.length?"選択科目を追加":"授業を登録");
+  document.getElementById("mTitle").textContent=r?"授業を編集":(editing.recs.length?"この枠に授業を追加":"授業を登録");
   document.getElementById("mSubject").value=r?r.subject:"";
   document.getElementById("mTeacher").value=r?r.teacher:"";
   document.getElementById("mRoom").value=r?r.room:"";
@@ -1587,18 +1587,18 @@ function loadFormFromEditing(){
   document.getElementById("mSave").textContent=(editing.recs.length===0)?"保存":((editing.idx>=0)?"更新":"追加");
   const fl=document.getElementById("formLabel");
   if(editing.recs.length===0){fl.style.display="none";}
-  else{fl.style.display="";fl.innerHTML=(editing.idx>=0)?`<span class="fl-edit">下の内容で「${esc(editing.recs[editing.idx].subject)}」を編集中</span>`:`<span class="fl-add">＋ 選択科目として新しい授業を追加</span>`;}
+  else{fl.style.display="";fl.innerHTML=(editing.idx>=0)?`<span class="fl-edit">下の内容で「${esc(editing.recs[editing.idx].subject)}」を編集中</span>`:`<span class="fl-add">＋ この枠に新しい授業を追加</span>`;}
 }
 function renderCellList(){
   const el=document.getElementById("cellList");
   if(!editing.recs.length){el.style.display="none";el.innerHTML="";return;}
   el.style.display="";
   const multi=editing.recs.length>1;
-  el.innerHTML=`<div class="cl-head">${multi?'<span class="cl-tag">選択科目</span>':''}この枠の授業（${editing.recs.length}件）</div>`+
+  el.innerHTML=`<div class="cl-head">${multi?'<span class="cl-tag">複数授業</span>':''}この枠の授業（${editing.recs.length}件）</div>`+
     editing.recs.map((r,i)=>`<div class="cl-item${i===editing.idx?' active':''}" data-i="${i}">
       <div class="cl-main"><b>${esc(r.subject)}</b>${r.teacher?` ／ ${esc(r.teacher)}`:""}${r.room?` ／ ${esc(r.room)}`:""}</div>
       <button class="cl-edit" data-i="${i}">編集</button><button class="cl-del" data-i="${i}">削除</button></div>`).join("")+
-    `<button class="cl-add" id="clAddBtn">＋ 選択科目を追加</button>`;
+    `<button class="cl-add" id="clAddBtn">＋ この枠に授業を追加</button>`;
   el.querySelectorAll(".cl-edit").forEach(b=>b.onclick=(e)=>{e.stopPropagation();editing.idx=+b.dataset.i;loadFormFromEditing();renderCellList();updateConflict();updateCopyArea();});
   el.querySelectorAll(".cl-item").forEach(it=>it.onclick=()=>{editing.idx=+it.dataset.i;loadFormFromEditing();renderCellList();updateConflict();updateCopyArea();});
   el.querySelectorAll(".cl-del").forEach(b=>b.onclick=(e)=>{e.stopPropagation();
@@ -2043,14 +2043,14 @@ async function exportClassExcel(which){
         pc.alignment={horizontal:'center',vertical:'middle',wrapText:true};pc.border=bd();
         let maxLines=3;
         DAYS.forEach((d,i)=>{const c=ws.getCell(row,2+i);
-          // 同じ枠の全授業（選択科目なら複数）
+          // 同じ枠の全授業（複数授業なら複数）
           const recs=data.filter(x=>x.grade===grade&&x.world===world&&x.day===d&&x.period===p);
           if(recs.length){
             const blocks=recs.map(rec=>{const lines=[rec.subject];
               if(rec.teacher)lines.push("講師: "+rec.teacher);
               if(rec.room)lines.push("教室: "+rec.room);
               if(rec.note)lines.push("※"+rec.note);return lines.join("\n");});
-            const text=(recs.length>1?"【選択科目】\n":"")+blocks.join("\n─────\n");
+            const text=(recs.length>1?"【複数授業】\n":"")+blocks.join("\n─────\n");
             c.value=text;c.font={size:9,color:{argb:C.ink}};
             c.fill={type:'pattern',pattern:'solid',fgColor:{argb:C.fill}};
             maxLines=Math.max(maxLines,text.split("\n").length);
@@ -2104,7 +2104,7 @@ function importClassJson(){
     if(mode==="replace"){
       lateRecords=recs.map(normClassRec);
     }else{
-      // マージ：grade|world|day|period をキーに「枠ごと」上書き（選択科目=同枠複数も保持）
+      // マージ：grade|world|day|period をキーに「枠ごと」上書き（同枠の複数授業も保持）
       const map={};
       lateRecords.forEach(r=>{const k=recKeyOf(r);(map[k]=map[k]||[]).push(r);});
       // 読み込んだデータは、同じ枠キーが来たら「その枠を丸ごと差し替え」
