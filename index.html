@@ -456,7 +456,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v13</span>
+  <span class="app-ver">v14</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
@@ -1301,6 +1301,15 @@ function buildPrintTable(title,sub,rows,theme){
     let tds=DAYS.map(d=>{const cell=map[d+"-"+p];const isNow=(d===NOW.day&&p===NOW.period);
       const cls=(cell?"slot":"slot empty")+(isNow?" nowcell":"");
       if(!cell)return `<td class="${cls}"></td>`;
+      // 複数授業（2件以上）はコンパクト表記（科目名＋講師・教室を1行）で高さを抑える
+      if(cell.length>1){
+        const dense=cell.length>=4?" dense":"";
+        return `<td class="${cls} multi${dense}">`+cell.map(r=>{
+          const info=[r.teacher?escP(r.teacher):"",r.room?escP(r.room):""].filter(Boolean).join("　");
+          return `<div class="mc"><div class="mc-s">${escP(r.subject)}</div>`+
+            (info||r.note?`<div class="mc-i">${info}${r.note?`<span class="mc-n">　※${escP(r.note)}</span>`:""}</div>`:"")+`</div>`;
+        }).join("")+'</td>';
+      }
       return `<td class="${cls}">`+cell.map(r=>`<div class="slot-card"><div class="s-subj">${escP(r.subject)}</div>${r.teacher?`<div class="s-line"><b>講師</b> ${escP(r.teacher)}</div>`:""}${r.room?`<div class="s-line"><b>教室</b> ${escP(r.room)}</div>`:""}${r.note?`<div class="s-note">${escP(r.note)}</div>`:""}</div>`).join("")+'</td>';
     }).join("");
     return `<tr><td class="period-cell">${p}限<span class="ptime">${escP(time)}</span></td>${tds}</tr>`;
@@ -1369,6 +1378,19 @@ function printTimetable(kind){
     .slot-card .s-line b{color:var(--ink);font-weight:600}
     .slot-card .s-note{font-size:.7rem;color:var(--g4);font-weight:600;margin-top:3px}
     .slot-card+.slot-card{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)}
+    /* 複数授業のコンパクト表記（印刷を1ページに収めるため） */
+    table.week td.slot.multi{padding:5px 7px}
+    .mc{padding:3px 0}
+    .mc+.mc{border-top:1px dotted var(--line)}
+    .mc-s{font-weight:700;font-size:.72rem;line-height:1.3}
+    .mc-i{font-size:.64rem;color:var(--ink-soft);line-height:1.35}
+    .mc-n{color:var(--g4);font-weight:600}
+    table.week td.slot.dense .mc-s{font-size:.66rem}
+    table.week td.slot.dense .mc-i{font-size:.58rem}
+    table.week td.slot.dense .mc{padding:2px 0}
+    /* 行の途中でページが分かれないようにする */
+    table.week tr{page-break-inside:avoid;break-inside:avoid}
+    table.week thead{display:table-header-group}
     .noprint{text-align:center;margin:6px 0 20px}
     .noprint button{font-size:14px;font-weight:700;padding:9px 24px;border:none;border-radius:9px;
       background:${btnColor};color:#fff;cursor:pointer;margin:0 5px;font-family:inherit}
