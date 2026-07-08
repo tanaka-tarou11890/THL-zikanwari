@@ -48,6 +48,12 @@
   .ym-sec .ym-d{font-size:.78rem;color:var(--ink-soft);margin-bottom:10px;line-height:1.5}
   .ym-sec .ym-row{display:flex;gap:8px;flex-wrap:wrap}
   .ym-card .ym-close{display:block;width:100%;margin-top:6px;background:var(--line-soft);color:var(--ink);border:none;padding:10px;border-radius:9px;font-weight:600}
+  .sc-grid{display:grid;grid-template-columns:52px repeat(5,1fr);gap:5px}
+  .sc-h{font-size:.72rem;font-weight:700;color:var(--ink-soft);display:flex;align-items:center;justify-content:center;padding:4px 0}
+  .sc-cell{border:1.5px solid var(--line);border-radius:8px;padding:6px 2px;text-align:center;font-size:.7rem;cursor:pointer;user-select:none;line-height:1.25;background:#fff}
+  .sc-cell.on{border-color:var(--accent);background:var(--accent);color:#fff;font-weight:700}
+  .sc-cell .sc-has{display:block;font-size:.6rem;color:#c0392b;font-weight:700}
+  .sc-cell.on .sc-has{color:#ffd9d4}
   .app-ver{font-size:.62rem;opacity:.55;color:#fff;letter-spacing:.03em}
   #syncWarn{background:#c0392b;color:#fff}
   #syncWarn .wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-top:9px;padding-bottom:9px}
@@ -450,7 +456,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v11</span>
+  <span class="app-ver">v13</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
@@ -495,6 +501,26 @@
       </div>
     </div>
     <button class="ym-close" id="ymClose">閉じる</button>
+  </div>
+</div>
+<div class="ym-overlay" id="slotCopyMenu">
+  <div class="ym-card">
+    <h3>この枠を他のコマへコピー</h3>
+    <div class="ym-sub" id="scSource"></div>
+    <div class="ym-sec">
+      <div class="ym-t">コピー先のワールド（複数選択可）</div>
+      <div class="ym-d">同じ学年の他のワールドにも、同じ内容をまとめて登録できます（英会話などの合同授業に便利です）。</div>
+      <div class="chips" id="scWorlds"></div>
+    </div>
+    <div class="ym-sec">
+      <div class="ym-t">コピー先の曜日・時限（複数選択可）</div>
+      <div class="ym-d">「授業あり」のコマにコピーすると、そのコマの内容は上書きされます。</div>
+      <div class="sc-grid" id="scGrid"></div>
+    </div>
+    <div class="ym-row" style="margin-bottom:6px">
+      <button class="btn edit" id="scExec">コピー実行</button>
+      <button class="btn ghost" id="scCancel">キャンセル</button>
+    </div>
   </div>
 </div>
 
@@ -865,13 +891,13 @@ function updateCopyArea(){
   // クラス分け表記など教員名でない値を弾く
   function looksLikeTeacher(t){if(!t)return true;return !(t.includes("：")||t.includes(":"))&&!/^[0-9０-９\s・\/／]+$/.test(t);}
   function collect(arr,src){arr.forEach(r=>{
-    if(r.subject!==subj)return;
+    if(!sameSubj(r.subject,subj))return;
     if(!r.teacher&&!r.room)return;
     if(!looksLikeTeacher(r.teacher))return; // 教員欄がノイズの候補は出さない
     const key=src+"|"+(r.teacher||"")+"|"+(r.room||"")+"|"+(r.note||"");
     if(seen.has(key))return;seen.add(key);
     cands.push({src,teacher:r.teacher||"",room:r.room||"",note:r.note||""});});}
-  collect(GEN,"early");
+  collect(earlyRecords,"early");
   collect(lateRecords,"late");
   // 現在の入力欄と完全一致する候補は除く
   const curT=document.getElementById("mTeacher").value.trim(),curR=document.getElementById("mRoom").value.trim();
@@ -897,6 +923,9 @@ function updateCopyArea(){
 
 // ===== 教室の重複チェック（同名科目は合同としてOK、異なる科目は警告） =====
 // 入力中の教室が、同じ後期・同じ曜日・同じ時限で、別の科目に使われていないか調べる
+/* 科目名の比較用正規化：全角/半角・スペースの違いを吸収して「同じ授業（合同）」を判定する */
+function normSubj(s){try{return (s||"").normalize("NFKC").replace(/[\s\u3000]/g,"");}catch(e){return (s||"").replace(/[\s\u3000]/g,"");}}
+function sameSubj(a,b){return !!a&&!!b&&normSubj(a)===normSubj(b);}
 function roomConflicts(){
   const room=document.getElementById("mRoom").value.trim();
   const subj=document.getElementById("mSubject").value.trim();
@@ -916,7 +945,7 @@ function roomConflicts(){
     const overlap=targets.some(t=>rRooms.includes(t))||(rRooms.length===0&&r.room.trim()===rawTarget)||(targets.length===0&&rRooms.includes(rawTarget));
     if(!overlap)return;
     const info={grade:r.grade,world:worldShortFull(r.world),subject:r.subject,room:r.room,teacher:r.teacher};
-    if(subj&&r.subject===subj)joint.push(info);else clash.push(info);
+    if(sameSubj(r.subject,subj))joint.push(info);else clash.push(info);
   });
   return{joint,clash};
 }
@@ -939,7 +968,7 @@ function teacherConflicts(){
     const rTeachers=r.teacher.split(/[／/]/).map(s=>s.trim());
     if(!rTeachers.includes(teacher))return;
     const info={grade:r.grade,world:worldShortFull(r.world),subject:r.subject,room:r.room,teacher:r.teacher};
-    if(subj&&r.subject===subj)joint.push(info);else clash.push(info);
+    if(sameSubj(r.subject,subj))joint.push(info);else clash.push(info);
   });
   return{joint,clash};
 }
@@ -1179,7 +1208,7 @@ function runIntegrityCheck(){
     recs.forEach(r=>{normRooms(r.room).forEach(rm=>{(roomMap[rm]=roomMap[rm]||[]).push(r);});});
     Object.keys(roomMap).forEach(rm=>{
       const list=roomMap[rm];
-      const subjects=[...new Set(list.map(r=>r.subject))];
+      const subjects=[...new Set(list.map(r=>normSubj(r.subject)))];
       const cells=[...new Set(list.map(cellKey))];
       // 別々の枠で、2種類以上の科目が同教室＝重複（同じ枠内の複数授業は除外）
       if(subjects.length>1&&cells.length>1){
@@ -1190,7 +1219,7 @@ function runIntegrityCheck(){
     const teaMap={};
     recs.forEach(r=>{teacherList(r.teacher).forEach(t=>{(teaMap[t]=teaMap[t]||[]).push(r);});});
     Object.keys(teaMap).forEach(t=>{
-      const list=teaMap[t];const subjects=[...new Set(list.map(r=>r.subject))];
+      const list=teaMap[t];const subjects=[...new Set(list.map(r=>normSubj(r.subject)))];
       const cells=[...new Set(list.map(cellKey))];
       if(subjects.length>1&&cells.length>1){
         teacherClashes.push({day,period:+period,teacher:t,items:list.map(r=>({grade:r.grade,world:worldShortFull(r.world),subject:r.subject,room:r.room}))});
@@ -1598,7 +1627,9 @@ function renderCellList(){
     editing.recs.map((r,i)=>`<div class="cl-item${i===editing.idx?' active':''}" data-i="${i}">
       <div class="cl-main"><b>${esc(r.subject)}</b>${r.teacher?` ／ ${esc(r.teacher)}`:""}${r.room?` ／ ${esc(r.room)}`:""}</div>
       <button class="cl-edit" data-i="${i}">編集</button><button class="cl-del" data-i="${i}">削除</button></div>`).join("")+
-    `<button class="cl-add" id="clAddBtn">＋ この枠に授業を追加</button>`;
+    `<button class="cl-add" id="clAddBtn">＋ この枠に授業を追加</button>`+
+    `<button class="cl-add" id="slotCopyBtn" style="margin-top:4px">⧉ この枠を他のコマへコピー</button>`;
+  const scb=el.querySelector("#slotCopyBtn");if(scb)scb.onclick=(e)=>{e.stopPropagation();openSlotCopy();};
   el.querySelectorAll(".cl-edit").forEach(b=>b.onclick=(e)=>{e.stopPropagation();editing.idx=+b.dataset.i;loadFormFromEditing();renderCellList();updateConflict();updateCopyArea();});
   el.querySelectorAll(".cl-item").forEach(it=>it.onclick=()=>{editing.idx=+it.dataset.i;loadFormFromEditing();renderCellList();updateConflict();updateCopyArea();});
   el.querySelectorAll(".cl-del").forEach(b=>b.onclick=(e)=>{e.stopPropagation();
@@ -1622,6 +1653,74 @@ function commitFormToEditing(silent){
   else{editing.recs.push(data);editing.idx=editing.recs.length-1;}
   return true;
 }
+/* ========== 枠コピー：この枠の複数授業を、他の曜日・時限／他ワールドへまとめて複製 ========== */
+let scSrc=null;const scSel={worlds:new Set(),slots:new Set()};
+function openSlotCopy(){
+  if(!editing||!editing.recs.length)return;
+  scSrc={grade:editGrade(),wShort:cstate.world,day:editing.day,period:editing.period,
+    recs:JSON.parse(JSON.stringify(editing.recs))};
+  scSel.worlds.clear();scSel.worlds.add(scSrc.wShort);
+  scSel.slots.clear();
+  document.getElementById("scSource").innerHTML=
+    `コピー元：<b>${scSrc.grade}年 ${esc(scSrc.wShort)} ${scSrc.day}曜${scSrc.period}限</b>（${scSrc.recs.length}件の授業）`;
+  renderScWorlds();renderScGrid();
+  document.getElementById("slotCopyMenu").classList.add("show");
+}
+function closeSlotCopy(){document.getElementById("slotCopyMenu").classList.remove("show");}
+function renderScWorlds(){
+  const el=document.getElementById("scWorlds");
+  const ws=(OPT.world_by_grade[String(scSrc.grade)]||[]).map(w=>worldShortFull(w));
+  el.innerHTML=ws.map(w=>`<div class="chip${scSel.worlds.has(w)?' on':''}" data-w="${esc(w)}">${esc(w)}</div>`).join("");
+  el.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{
+    const w=c.dataset.w;
+    if(scSel.worlds.has(w))scSel.worlds.delete(w);else scSel.worlds.add(w);
+    renderScWorlds();renderScGrid();});
+}
+function renderScGrid(){
+  const el=document.getElementById("scGrid");
+  let html=`<div class="sc-h"></div>`+DAYS.map(d=>`<div class="sc-h">${d}</div>`).join("");
+  PERIODS.forEach(p=>{
+    html+=`<div class="sc-h">${p}限</div>`;
+    DAYS.forEach(d=>{
+      const key=d+"|"+p;
+      // 選択中のワールドのどこかに既存授業があれば「授業あり」
+      const has=[...scSel.worlds].some(w=>cellRecords(scSrc.grade,w,d,p).length>0);
+      const isSrc=(d===scSrc.day&&p===scSrc.period);
+      html+=`<div class="sc-cell${scSel.slots.has(key)?' on':''}" data-k="${key}">${isSrc?'元':'&nbsp;'}${has?'<span class="sc-has">授業あり</span>':'<span class="sc-has">&nbsp;</span>'}</div>`;
+    });
+  });
+  el.innerHTML=html;
+  el.querySelectorAll(".sc-cell").forEach(c=>c.onclick=()=>{
+    const k=c.dataset.k;
+    if(scSel.slots.has(k))scSel.slots.delete(k);else scSel.slots.add(k);
+    renderScGrid();});
+}
+function execSlotCopy(){
+  if(!scSrc)return;
+  if(!scSel.worlds.size){alert("コピー先のワールドを選んでください。");return;}
+  if(!scSel.slots.size){alert("コピー先の曜日・時限を選んでください。");return;}
+  // コピー先一覧を作成（コピー元自身は除外）
+  const dests=[];
+  scSel.worlds.forEach(w=>{scSel.slots.forEach(k=>{
+    const [d,pStr]=k.split("|");const p=+pStr;
+    if(w===scSrc.wShort&&d===scSrc.day&&p===scSrc.period)return;
+    dests.push({w,d,p});});});
+  if(!dests.length){alert("コピー元と同じコマしか選ばれていません。別のコマを選んでください。");return;}
+  const overwrite=dests.filter(t=>cellRecords(scSrc.grade,t.w,t.d,t.p).length>0);
+  let msg=`${dests.length}コマにコピーします。`;
+  if(overwrite.length)msg+=`\nうち ${overwrite.length}コマ には既に授業があり、上書きされます。`;
+  msg+="\nよろしいですか？";
+  if(!confirm(msg))return;
+  dests.forEach(t=>saveCellRecords(scSrc.grade,t.w,t.d,t.p,scSrc.recs));
+  closeSlotCopy();closeModal();renderClass();
+  setSaved(`枠コピー完了（${dests.length}コマ）`);
+  alert(`${dests.length}コマにコピーしました。`);
+}
+(function wireSlotCopy(){
+  const ex=document.getElementById("scExec");if(ex)ex.onclick=execSlotCopy;
+  const ca=document.getElementById("scCancel");if(ca)ca.onclick=closeSlotCopy;
+  const ov=document.getElementById("slotCopyMenu");if(ov)ov.onclick=e=>{if(e.target.id==="slotCopyMenu")closeSlotCopy();};
+})();
 function closeModal(){document.getElementById("overlay").classList.remove("show");editing=null;
   document.getElementById("mSave").textContent="保存";
   document.getElementById("cellList").style.display="none";
