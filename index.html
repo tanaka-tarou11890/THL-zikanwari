@@ -456,7 +456,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v14</span>
+  <span class="app-ver">v15</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
@@ -1317,18 +1317,27 @@ function buildPrintTable(title,sub,rows,theme){
   return `<div class="sheet"><div class="grid-head"><span class="gtitle">${escP(title)}</span><span class="gworld">${escP(sub)}</span></div><div class="table-scroll"><table class="week theme-${theme}"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div></div>`;
 }
 function escP(s){return (s||"").replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]));}
+/* ワールド別の印刷テーマ（ヘッダー行・時限列の色分け） */
+function worldPrintTheme(wShort){
+  if(!wShort)return null;
+  if(wShort.indexOf("ホテル")===0)return "w-hotel";
+  if(wShort.indexOf("観光")===0)return "w-tour";
+  if(wShort.indexOf("エアーライン")===0||wShort.indexOf("エアライン")===0)return "w-air";
+  if(wShort.indexOf("ブライダル")===0)return "w-bridal";
+  return null;
+}
 function printTimetable(kind){
   let sheets="",docTitle="",theme="accent";
   if(kind==="class"){
     if(!cstate.grade||!cstate.world){alert("印刷するには、学年とワールドを1つずつ選んで時間割を表示してください。");return;}
-    theme=isLate()?"edit":"accent";
+    theme=worldPrintTheme(cstate.world)||(isLate()?"edit":"accent");
     const wfull=fullWorldName(cstate.grade,cstate.world);
     const rows=classData().filter(r=>r.grade===cstate.grade&&worldShortFull(r.world)===cstate.world);
     docTitle=`${cstate.grade}年 ${cstate.world} 時間割`;
     sheets=buildPrintTable(`${cstate.grade}年 ${cstate.world}`,`2026年度 ${term==="early"?"前期":"後期"} ／ ${wfull}`,rows,theme);
   }else if(kind==="person-one"){
-    theme=isLate()?"edit":"person";
     const pinfo=personList().find(p=>p.name===pstate.person)||{};
+    theme=worldPrintTheme(pinfo.world?worldShortFull(pinfo.world):null)||(isLate()?"edit":"person");
     const rows=personRecords().filter(r=>r.person===pstate.person);
     docTitle=`${pstate.person} 時間割`;
     sheets=buildPrintTable(`${pstate.person}`,`2026年度 ${term==="early"?"前期":"後期"} ／ ${pinfo.grade}年${pinfo.world?" "+worldShortFull(pinfo.world):""}`,rows,theme);
@@ -1337,12 +1346,14 @@ function printTimetable(kind){
     docTitle="学生別時間割（全員）";
     sheets=personList().map(p=>{
       const rows=personRecords().filter(r=>r.person===p.name);
-      return buildPrintTable(p.name,`2026年度 ${term==="early"?"前期":"後期"} ／ ${p.grade}年${p.world?" "+worldShortFull(p.world):""}`,rows,theme);
+      const th=worldPrintTheme(p.world?worldShortFull(p.world):null)||theme;
+      return buildPrintTable(p.name,`2026年度 ${term==="early"?"前期":"後期"} ／ ${p.grade}年${p.world?" "+worldShortFull(p.world):""}`,rows,th);
     }).join('<div class="pgbreak"></div>');
   }
   const w=window.open("","_blank");
   if(!w){alert("ポップアップがブロックされました。印刷するにはこのサイトのポップアップを許可してください。");return;}
-  const btnColor=theme==="edit"?"#7a4ea8":(theme==="person"?"#0a7d6b":"#0b6e8f");
+  const btnColor=({"w-hotel":"#1E5B3C","w-tour":"#C9A20E","w-air":"#3B9CC2","w-bridal":"#D9548E",
+    "edit":"#7a4ea8","person":"#0a7d6b"})[theme]||"#0b6e8f";
   w.document.write(`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>${escP(docTitle)}</title><style>
     :root{--ink:#1a2332;--ink-soft:#5a6478;--line:#dde3ec;--line-soft:#eef1f6;--now:#ffe9a8;--g4:#c77d0a;
       --accent:#0b6e8f;--accent-d:#0a5570;--edit:#7a4ea8;--edit-d:#5e3a85;--person:#0a7d6b;--person-d:#075a4d;}
@@ -1365,6 +1376,23 @@ function printTimetable(kind){
     table.week.theme-edit thead th.corner{background:var(--edit-d)}
     table.week.theme-person thead th{background:var(--person)}
     table.week.theme-person thead th.corner{background:var(--person-d)}
+    /* ワールド別カラー：ホテル=深緑（白文字）、観光=黄色・エアーライン=水色・ブライダル=ピンク（濃色文字） */
+    table.week.theme-w-hotel thead th{background:#1E5B3C;color:#fff}
+    table.week.theme-w-hotel thead th.corner{background:#14432C}
+    table.week.theme-w-hotel td.period-cell{background:#E4F0E9;color:#1B4A31}
+    table.week.theme-w-hotel td.period-cell .ptime{color:#4C7A62}
+    table.week.theme-w-tour thead th{background:#F5C826;color:#4A3A00}
+    table.week.theme-w-tour thead th.corner{background:#E0B312}
+    table.week.theme-w-tour td.period-cell{background:#FBF1CB;color:#5C4A00}
+    table.week.theme-w-tour td.period-cell .ptime{color:#8A7420}
+    table.week.theme-w-air thead th{background:#8ED2EC;color:#0C3D52}
+    table.week.theme-w-air thead th.corner{background:#6FC2E1}
+    table.week.theme-w-air td.period-cell{background:#E6F5FB;color:#0F455C}
+    table.week.theme-w-air td.period-cell .ptime{color:#3C7A94}
+    table.week.theme-w-bridal thead th{background:#F4B4CC;color:#6E1F44}
+    table.week.theme-w-bridal thead th.corner{background:#EC98B9}
+    table.week.theme-w-bridal td.period-cell{background:#FBE9F1;color:#762450}
+    table.week.theme-w-bridal td.period-cell .ptime{color:#A65B80}
     table.week thead th.todaycol{box-shadow:inset 0 -3px 0 var(--now)}
     table.week td.period-cell{background:var(--line-soft);text-align:center;font-weight:700;color:var(--ink);
       font-size:.8rem;padding:8px 6px;width:78px;white-space:nowrap}
