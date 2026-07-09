@@ -473,7 +473,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v18</span>
+  <span class="app-ver">v19</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
@@ -700,6 +700,11 @@
 var VIEWER_MODE=(location.protocol!=="file:")&&(location.pathname.indexOf("/edit")===-1)&&(location.search.indexOf("edit")===-1);
 /* 閲覧版の学生用キー（?s=XXXX）。あれば学生別タブに本人の時間割だけを表示する */
 var VIEWER_STUDENT_KEY=(function(){try{const m=location.search.match(/[?&]s=([a-z0-9]+)/i);return m?m[1]:null;}catch(e){return null;}})();
+/* ワールド用URL（?w=hotel など）：開いた時からそのワールドの時間割を表示する */
+const WORLD_URL_KEYS={hotel:"ホテル",tour:"観光",air:"エアライン",dress:"ブライダル(ドレス)",planner:"ブライダル(プランナー)"};
+var VIEWER_WORLD=(function(){try{const m=location.search.match(/[?&]w=([^&]+)/);if(!m)return null;
+  const v=decodeURIComponent(m[1]);return WORLD_URL_KEYS[v]||v;}catch(e){return null;}})();
+var VIEWER_GRADE=(function(){try{const m=location.search.match(/[?&]g=([1-4])(?:[^0-9]|$)/);return m?+m[1]:null;}catch(e){return null;}})();
 /* 年度（例：2026）。サーバーに保存され、書き出し・新年度作成の単位になる */
 let schoolYear=(function(){try{const s=localStorage.getItem("thl_year_v1");if(s)return parseInt(s,10);}catch(e){}
   // 初期値：4月以降はその年、1〜3月は前年を年度とする
@@ -1087,6 +1092,20 @@ function buildGrid(rows,q,opts){opts=opts||{};
 
 /* ========== クラスタブ ========== */
 const cstate={q:"",grade:null,world:null,day:null,period:null};
+/* ワールド用URL（?w=ワールド名、任意で&g=学年）：開いた時点でそのワールドを選択して表示する */
+(function(){
+  try{
+    const mw=location.search.match(/[?&]w=([^&]+)/);
+    if(!mw)return;
+    const wname=decodeURIComponent(mw[1]);
+    const all=new Set();[1,2,3,4].forEach(g=>(OPT.world_by_grade[String(g)]||[]).forEach(x=>all.add(worldShortFull(x))));
+    if(!all.has(wname))return; // 不明なワールド名は無視
+    cstate.world=wname;
+    const mg=location.search.match(/[?&]g=([1-4])/);
+    if(mg){const g=+mg[1];
+      if((OPT.world_by_grade[String(g)]||[]).some(x=>worldShortFull(x)===wname))cstate.grade=g;}
+  }catch(e){}
+})();
 let worldGroups=[];
 function rebuildWorldChips(){
   // 前期は実在ワールド、後期は学年別の全ワールド（空でも編集できるように）
@@ -1141,11 +1160,13 @@ function renderEditToolbar(){
       <button class="btn ghost" id="checkAll">整合チェック</button>
       <button class="btn ok" id="exportEarlyXlsx">Excel出力</button>
       <button class="btn ghost" id="yearMenuBtnE">年度メニュー</button>
+      <button class="btn ghost" id="worldUrlBtnE">ワールドURL一覧</button>
     </div><div id="progressPanel"></div><div id="checkPanel"></div>`;
     document.getElementById("toggleEarlyEdit").onclick=()=>{earlyEditMode=!earlyEditMode;renderClass();};
     document.getElementById("exportEarlyXlsx").onclick=exportEarlyExcel;
     document.getElementById("checkAll").onclick=()=>{checkOpen=!checkOpen;if(checkOpen)progressOpen=false;renderProgress();renderCheck();};
     const ym=document.getElementById("yearMenuBtnE");if(ym)ym.onclick=openYearMenu;
+    const wu=document.getElementById("worldUrlBtnE");if(wu)wu.onclick=exportWorldUrls;
     renderCheck();
     return;
   }
@@ -1159,6 +1180,7 @@ function renderEditToolbar(){
     <button class="btn ghost" id="exportJson">JSON出力</button>
     <button class="btn ghost" id="importJson">JSON読込</button>
     <button class="btn ghost" id="yearMenuBtnL">年度メニュー</button>
+    <button class="btn ghost" id="worldUrlBtnL">ワールドURL一覧</button>
     <button class="btn danger-ghost" id="resetLate">後期データを消去</button>
   </div><div id="progressPanel"></div><div id="checkPanel"></div>`;
   document.getElementById("exportXlsx").onclick=exportExcel;
@@ -1166,6 +1188,7 @@ function renderEditToolbar(){
   document.getElementById("importJson").onclick=importClassJson;
   document.getElementById("resetLate").onclick=()=>{if(confirm("後期に登録したデータをすべて消去します。よろしいですか？")){lateRecords=[];saveLate();renderClass();}};
   const ymL=document.getElementById("yearMenuBtnL");if(ymL)ymL.onclick=openYearMenu;
+  const wuL=document.getElementById("worldUrlBtnL");if(wuL)wuL.onclick=exportWorldUrls;
   document.getElementById("toggleProgress").onclick=()=>{progressOpen=!progressOpen;if(progressOpen)checkOpen=false;renderProgress();renderCheck();};
   document.getElementById("checkAll").onclick=()=>{checkOpen=!checkOpen;if(checkOpen)progressOpen=false;renderProgress();renderCheck();};
   document.getElementById("printClass").onclick=()=>printTimetable("class");
@@ -1857,6 +1880,27 @@ function rebuildPersonPick(){
     if(b.id==="addStudentBtn"){b.onclick=()=>openStudentModal(null);return;}
     b.onclick=()=>{pstate.person=(pstate.person===b.dataset.name)?null:b.dataset.name;renderPerson();};
   });
+}
+/* ワールド（コース）ごとの閲覧URL一覧をテキストで書き出す（誰に配ってもよい公開URL） */
+function exportWorldUrls(){
+  const base=(location.origin&&location.origin!=="null"&&location.protocol!=="file:")?location.origin:"https://（あなたのURL）.vercel.app";
+  const order=[];const seen=new Set();
+  [1,2,3,4].forEach(g=>(OPT.world_by_grade[String(g)]||[]).forEach(x=>{const sh=worldShortFull(x);
+    if(!seen.has(sh)){seen.add(sh);order.push(sh);}}));
+  // URLは短い英字キー（hotel/tour/air/dress/planner）を優先して使う
+  const K2={};Object.keys(WORLD_URL_KEYS).forEach(k=>{K2[WORLD_URL_KEYS[k]]=k;});
+  const wp=sh=>K2[sh]||encodeURIComponent(sh);
+  let txt="ワールド（コース）別 時間割URL一覧\n作成: "+new Date().toLocaleString("ja-JP")+"\n";
+  txt+="※クラス時間割の公開ページを、そのワールドを選択した状態で開くURLです。誰に配っても問題ありません。\n\n";
+  txt+="■ ワールド全体（全学年をまとめて表示）\n";
+  txt+=order.map(sh=>`${sh}\t${base}/?w=${wp(sh)}`).join("\n");
+  txt+="\n\n■ 学年別\n";
+  [1,2,3,4].forEach(g=>{(OPT.world_by_grade[String(g)]||[]).forEach(x=>{const sh=worldShortFull(x);
+    txt+=`${g}年 ${sh}\t${base}/?w=${wp(sh)}&g=${g}\n`;});});
+  const blob=new Blob([txt],{type:"text/plain;charset=utf-8"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);
+  a.download="ワールドURL一覧.txt";a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
 /* 学生ごとの閲覧URL一覧をテキストで書き出す（本人にのみ配布する） */
 function exportStudentUrls(){
@@ -2638,6 +2682,9 @@ async function doPush(){
     const h1=document.querySelector("#appHeader h1");if(h1)h1.textContent="THL 時間割（閲覧版）";
     // 学生別タブは初期非表示。有効な学生用URL（?s=）のときだけserverLoad後に表示される
     const pt=document.querySelector('.tab[data-tab="person"]');if(pt)pt.style.display="none";
+    // ワールド用URL：最初からそのワールド（と学年）を選択した状態にする
+    if(VIEWER_WORLD){cstate.world=VIEWER_WORLD;if(VIEWER_GRADE)cstate.grade=VIEWER_GRADE;
+      try{refreshChips("#classView",cstate);}catch(e){}}
   }else if(location.protocol!=="file:"){
     // 編集画面：入口ゲートの配線（Enterキーでも送信）
     const b=document.getElementById("gateBtn");if(b)b.onclick=gateSubmit;
