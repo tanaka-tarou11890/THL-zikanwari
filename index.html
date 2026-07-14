@@ -473,7 +473,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v19</span>
+  <span class="app-ver">v21</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
@@ -804,8 +804,15 @@ function isEditable(){return !VIEWER_MODE&&(term==="late"||(term==="early"&&earl
 
 // ===== ユーティリティ =====
 function esc(s){return (s||"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));}
-function hl(s,q){if(!q||!s)return esc(s||"");const i=s.toLowerCase().indexOf(q.toLowerCase());
-  if(i<0)return esc(s);return esc(s.slice(0,i))+"<mark>"+esc(s.slice(i,i+q.length))+"</mark>"+esc(s.slice(i+q.length));}
+/* 検索用の正規化：全角スペース・全角英数字を半角と同一視し、大文字小文字も無視する */
+function normQ(s){try{return (s||"").normalize("NFKC").toLowerCase();}catch(e){return (s||"").toLowerCase();}}
+function hl(s,q){if(!q||!s)return esc(s||"");
+  const ns=normQ(s),nq=normQ(q);
+  let i,len;
+  if(ns.length===s.length){i=ns.indexOf(nq);len=nq.length;}       // 1文字対1文字なら正規化して照合
+  else{i=s.toLowerCase().indexOf(q.toLowerCase());len=q.length;}  // まれな桁ずれ時は従来照合
+  if(i<0)return esc(s);
+  return esc(s.slice(0,i))+"<mark>"+esc(s.slice(i,i+len))+"</mark>"+esc(s.slice(i+len));}
 function worldShortFull(w){let s=w.replace(/（[^）]*）/g,"");
   s=s.replace("ブライダルワールド【プランナーコース】","ブライダル(プランナー)");
   s=s.replace("ブライダルワールド【ドレスコーディネーターコース】","ブライダル(ドレス)");
@@ -1473,14 +1480,14 @@ function printTimetable(kind){
 }
 
 function renderClass(){
-  const q=cstate.q.trim().toLowerCase();
+  const q=normQ(cstate.q).trim();
   renderEditToolbar();
   updateIntegBadge();
   let rows=classData().filter(r=>{
     if(cstate.grade&&r.grade!==cstate.grade)return false;
     if(cstate.world&&worldShortFull(r.world)!==cstate.world)return false;
     if(cstate.day&&r.day!==cstate.day)return false;if(cstate.period&&r.period!==cstate.period)return false;
-    if(q){const h=(r.subject+" "+r.teacher+" "+r.room+" "+(r.note||"")).toLowerCase();if(!h.includes(q))return false;}return true;});
+    if(q){const h=normQ(r.subject+" "+r.teacher+" "+r.room+" "+(r.note||""));if(!h.includes(q))return false;}return true;});
   const note=document.getElementById("classNote"),out=document.getElementById("classOut");
   const gset=new Set(rows.map(r=>r.grade)),wset=new Set(rows.map(r=>worldShortFull(r.world)));
   // 編集モード（後期 or 前期編集ON）: 学年×ワールドが1つに定まれば編集グリッド
@@ -1505,7 +1512,7 @@ function renderClass(){
       const wfull=fullWorldName(g,wShort);
       const grows=classData().filter(r=>r.grade===g&&worldShortFull(r.world)===wShort
         &&(!cstate.day||r.day===cstate.day)&&(!cstate.period||r.period===cstate.period)
-        &&(!q||(r.subject+" "+r.teacher+" "+r.room+" "+(r.note||"")).toLowerCase().includes(q)));
+        &&(!q||normQ(r.subject+" "+r.teacher+" "+r.room+" "+(r.note||"")).includes(q)));
       html+=`<div class="multi-grid"><div class="grid-head"><span class="gtitle">${g}年 ${esc(wShort)}</span><span class="gworld">${term==="early"?"前期":"後期"} / ${esc(wfull)}</span><button class="btn ghost btn-sm" data-print-g="${g}">印刷</button></div>`+
         buildGrid(grows,q,{cls:isEditable()?"e":"",editable:isEditable(),grade:g,day:cstate.day,period:cstate.period,world:cstate.world})+`</div>`;
     });
@@ -1531,9 +1538,24 @@ function renderClass(){
     if(isEditable())bindEditCells();
     const pb=document.getElementById("printClassOne");if(pb)pb.onclick=()=>printTimetable("class");
   }else{
-    note.innerHTML='<div class="mode-note">複数の学年・ワールドが対象のため<b>カード一覧</b>で表示中。'+(isEditable()?'編集するには学年とワールドを選んでください。':'')+'</div>';
-    rows.sort((a,b)=>a.grade-b.grade||DAYS.indexOf(a.day)-DAYS.indexOf(b.day)||a.period-b.period);
-    out.innerHTML='<div class="results">'+rows.map(r=>{const g="g"+r.grade;return `<div class="card ${g}"><div class="subj">${hl(r.subject,q)}</div><div class="meta"><span class="tag grade ${g}">${r.grade}年</span><span class="tag">${worldShortFull(r.world)}</span><span class="tag day">${r.day} ${r.period}限</span></div><div class="info"><div><b>時間</b>${r.time||PTIME_FULL[r.period]}</div>${r.teacher?`<div><b>担当</b>${hl(r.teacher,q)}</div>`:""}${r.room?`<div><b>教室</b>${hl(r.room,q)}</div>`:""}</div>${r.note?`<div class="note">${esc(r.note)}</div>`:""}</div>`;}).join("")+'</div>';
+    // 複数の学年・ワールドにまたがる結果も、学年×ワールドごとの時間割グリッドで表示する
+    note.innerHTML='<div class="mode-note">複数の学年・ワールドに該当したため、<b>組み合わせごとの時間割</b>で表示中。'+(isEditable()?'編集するには学年とワールドを選んでください。':'')+'</div>';
+    // グループ化：学年 → ワールド（定義順）
+    const groups={};
+    rows.forEach(r=>{const k=r.grade+"|"+worldShortFull(r.world);(groups[k]=groups[k]||[]).push(r);});
+    const keys=Object.keys(groups).sort((a,b)=>{
+      const [ga,wa]=a.split("|"),[gb,wb]=b.split("|");
+      if(+ga!==+gb)return +ga-+gb;
+      const order=(OPT.world_by_grade[ga]||[]).map(x=>worldShortFull(x));
+      return order.indexOf(wa)-order.indexOf(wb);
+    });
+    out.innerHTML=keys.map(k=>{
+      const [gStr,wShort]=k.split("|");const g=+gStr;
+      const grows=groups[k];
+      const wfull=fullWorldName(g,wShort);
+      return `<div class="multi-grid"><div class="grid-head"><span class="gtitle">${g}年 ${esc(wShort)}</span><span class="gworld">${term==="early"?"前期":"後期"} / ${esc(wfull)}</span></div>`+
+        buildGrid(grows,q,{cls:"",editable:false,day:cstate.day,period:cstate.period,world:wShort})+`</div>`;
+    }).join("");
   }
 }
 function fullWorldName(grade,shortName){
@@ -1935,7 +1957,7 @@ function renderPersonToolbar(){
   document.getElementById("printPersonAll").onclick=()=>{if(!latePersons.length){alert("学生が登録されていません");return;}printTimetable("person-all");};
   document.getElementById("resetLateP").onclick=()=>{if(confirm("後期の学生別データ（学生と時間割）をすべて消去します。よろしいですか？")){latePersons=[];lateP=[];saveLateP();pstate.person=null;rebuildPersonPick();renderPerson();}};
 }
-function renderPerson(){const q=pstate.q.trim().toLowerCase();
+function renderPerson(){const q=normQ(pstate.q).trim();
   renderPersonToolbar();
   document.querySelectorAll("#personPick .pbtn").forEach(b=>b.classList.toggle("on",b.dataset.name===pstate.person));
   const note=document.getElementById("personNote"),out=document.getElementById("personOut");
@@ -1945,7 +1967,7 @@ function renderPerson(){const q=pstate.q.trim().toLowerCase();
   const pinfo=personList().find(p=>p.name===pstate.person)||{};
   const grade=pinfo.grade;
   let rows=personRecords().filter(r=>r.person===pstate.person);
-  if(q)rows=rows.filter(r=>(r.subject+" "+r.teacher+" "+r.room+" "+(r.note||"")).toLowerCase().includes(q));
+  if(q)rows=rows.filter(r=>normQ(r.subject+" "+r.teacher+" "+r.room+" "+(r.note||"")).includes(q));
   if(isEditable()){
     note.innerHTML=`<div class="mode-note e"><b>${esc(pstate.person)}</b> さん（${grade}年${pinfo.world?" / "+worldShortFull(pinfo.world):""}）の後期時間割。マスをクリックして編集できます。<a href="#" id="editStudentLink" style="color:var(--edit);font-weight:700;margin-left:8px">学生情報を編集</a></div>`;
     out.innerHTML=`<div class="grid-head"><span class="gtitle">${esc(pstate.person)}</span><span class="gworld">後期 / ${grade}年${pinfo.world?" "+worldShortFull(pinfo.world):""}</span><button class="btn ghost btn-sm" id="printPersonOne">この学生を印刷</button></div>`+buildGrid(rows,q,{cls:"e",editable:true,world:pinfo.world?worldShortFull(pinfo.world):null});
