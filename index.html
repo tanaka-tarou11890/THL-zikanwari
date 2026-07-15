@@ -3,13 +3,31 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<!-- PWA：ホーム画面に追加するとアプリとして動作する -->
-<link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0b6e8f">
-<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<!-- PWA：閲覧トップ（?s=や?w=が無いとき）だけmanifestを付ける。
+     iOSは<head>解析時にmanifestを読むため、学生/ワールドURLでは最初から書かないことでURL短縮を防ぐ -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="THL時間割">
+<script>
+(function(){try{
+  var q=location.search||"";
+  var isStudent=/[?&]s=/.test(q);
+  var isWorld=/[?&]w=/.test(q);
+  var head=document.head||document.getElementsByTagName("head")[0];
+  function add(tag,attrs){var e=document.createElement(tag);for(var k in attrs)e.setAttribute(k,attrs[k]);head.appendChild(e);}
+  if(!isStudent&&!isWorld){
+    // 閲覧トップ：閲覧アプリのmanifest・アイコン
+    add("link",{rel:"manifest",href:"/manifest.json"});
+    add("meta",{name:"theme-color",content:"#0b6e8f"});
+    add("link",{rel:"apple-touch-icon",href:"/apple-touch-icon.png"});
+    add("meta",{name:"apple-mobile-web-app-title",content:"THL時間割"});
+  }else{
+    // 学生/ワールドURL：manifestを付けない（＝iOSがURLをそのまま登録）。アイコンだけ指定
+    add("link",{rel:"apple-touch-icon",href:"/apple-touch-icon.png"});
+    add("meta",{name:"theme-color",content:"#0b6e8f"});
+    add("meta",{name:"apple-mobile-web-app-title",content:(isStudent?"THL時間割":"THL時間割")});
+  }
+}catch(e){}})();
+</script>
 
 <title>THL 時間割ツール — 2026年度</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
@@ -481,7 +499,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v22</span>
+  <span class="app-ver">v23</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
