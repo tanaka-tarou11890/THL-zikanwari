@@ -3,6 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- PWA：ホーム画面に追加するとアプリとして動作する -->
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0b6e8f">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="THL時間割">
 <title>THL 時間割ツール — 2026年度</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <style>
@@ -473,7 +480,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v21</span>
+  <span class="app-ver">v23β</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
@@ -705,6 +712,26 @@ const WORLD_URL_KEYS={hotel:"ホテル",tour:"観光",air:"エアライン",dres
 var VIEWER_WORLD=(function(){try{const m=location.search.match(/[?&]w=([^&]+)/);if(!m)return null;
   const v=decodeURIComponent(m[1]);return WORLD_URL_KEYS[v]||v;}catch(e){return null;}})();
 var VIEWER_GRADE=(function(){try{const m=location.search.match(/[?&]g=([1-4])(?:[^0-9]|$)/);return m?+m[1]:null;}catch(e){return null;}})();
+/* ===== PWA ===== */
+// Service Worker登録（https時のみ。file://では何もしない）
+if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost")){
+  window.addEventListener("load",()=>{navigator.serviceWorker.register("/sw.js").catch(()=>{});});
+}
+// 学生URL・ワールドURLを記憶し、インストール済みアプリから素のURLで起動したときに自動で復帰する
+(function(){
+  try{
+    if(VIEWER_STUDENT_KEY){localStorage.setItem("thl_pwa_last","s="+VIEWER_STUDENT_KEY);}
+    else if(VIEWER_WORLD){
+      const m=location.search.match(/[?&]w=([^&]+)/);
+      if(m)localStorage.setItem("thl_pwa_last","w="+m[1]+(VIEWER_GRADE?("&g="+VIEWER_GRADE):""));
+    }
+    const standalone=(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches)||window.navigator.standalone===true;
+    if(standalone&&VIEWER_MODE&&!location.search){
+      const last=localStorage.getItem("thl_pwa_last");
+      if(last)location.replace("/?"+last);
+    }
+  }catch(e){}
+})();
 /* 年度（例：2026）。サーバーに保存され、書き出し・新年度作成の単位になる */
 let schoolYear=(function(){try{const s=localStorage.getItem("thl_year_v1");if(s)return parseInt(s,10);}catch(e){}
   // 初期値：4月以降はその年、1〜3月は前年を年度とする
