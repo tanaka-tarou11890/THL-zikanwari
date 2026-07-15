@@ -1,0 +1,17 @@
+{
+  "name": "THL 時間割ツール（編集）",
+  "short_name": "THL編集",
+  "description": "THL時間割ツールの編集画面（担当者用）",
+  "lang": "ja",
+  "id": "/edit",
+  "start_url": "/edit",
+  "scope": "/edit",
+  "display": "standalone",
+  "background_color": "#f4f6f9",
+  "theme_color": "#7a4ea8",
+  "icons": [
+    { "src": "/icon-edit-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-edit-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-edit-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

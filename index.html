@@ -10,6 +10,18 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="THL時間割">
+<script>
+/* 編集画面（/edit）は「編集アプリ」として独立させる：専用manifest・紫アイコンに切替 */
+(function(){try{
+  var isEdit=/\/edit(\/|$)/.test(location.pathname)||/[?&]edit(=|&|$)/.test(location.search);
+  if(isEdit){
+    var l=document.querySelector('link[rel="manifest"]');if(l)l.href="/manifest-edit.json";
+    var a=document.querySelector('link[rel="apple-touch-icon"]');if(a)a.href="/apple-touch-icon-edit.png";
+    var t=document.querySelector('meta[name="theme-color"]');if(t)t.setAttribute("content","#7a4ea8");
+    var n=document.querySelector('meta[name="apple-mobile-web-app-title"]');if(n)n.setAttribute("content","THL編集");
+  }
+}catch(e){}})();
+</script>
 <title>THL 時間割ツール — 2026年度</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <style>
@@ -480,7 +492,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v23β</span>
+  <span class="app-ver">v24β</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
