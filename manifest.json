@@ -3,8 +3,6 @@
   "short_name": "THL時間割",
   "description": "東京ホテル・観光＆ホスピタリティ専門学校の時間割ツール",
   "lang": "ja",
-  "start_url": "/",
-  "scope": "/",
   "display": "standalone",
   "background_color": "#f4f6f9",
   "theme_color": "#0b6e8f",

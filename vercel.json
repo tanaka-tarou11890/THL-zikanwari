@@ -2,6 +2,7 @@
   "rewrites": [
     { "source": "/", "has": [{ "type": "query", "key": "s" }], "destination": "/student.html" },
     { "source": "/", "has": [{ "type": "query", "key": "w" }], "destination": "/student.html" },
+    { "source": "/", "has": [{ "type": "query", "key": "y" }], "destination": "/student.html" },
     { "source": "/edit", "destination": "/edit.html" }
   ]
 }

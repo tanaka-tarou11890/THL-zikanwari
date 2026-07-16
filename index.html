@@ -12,19 +12,18 @@
   var q=location.search||"";
   var isStudent=/[?&]s=/.test(q);
   var isWorld=/[?&]w=/.test(q);
+  var isYear=/[?&]y=/.test(q);
   var head=document.head||document.getElementsByTagName("head")[0];
   function add(tag,attrs){var e=document.createElement(tag);for(var k in attrs)e.setAttribute(k,attrs[k]);head.appendChild(e);}
-  if(!isStudent&&!isWorld){
-    // 閲覧トップ：閲覧アプリのmanifest・アイコン
+  // パラメータ付き（年度・学生・ワールド）のURLは manifest を付けない。
+  // → iOSでもホーム画面に「今開いているURL（?y=2026 など）」がそのまま登録され、アイコンから正しく開ける。
+  //   manifest を付けると start_url に固定され、年度付きURLが保存されない不具合になる。
+  add("meta",{name:"theme-color",content:"#0b6e8f"});
+  add("link",{rel:"apple-touch-icon",href:"/apple-touch-icon.png"});
+  add("meta",{name:"apple-mobile-web-app-title",content:"THL時間割"});
+  if(!isStudent&&!isWorld&&!isYear){
+    // パラメータの無い素の "/" だけ、閲覧アプリの manifest を付ける（この画面は年度案内になる）
     add("link",{rel:"manifest",href:"/manifest.json"});
-    add("meta",{name:"theme-color",content:"#0b6e8f"});
-    add("link",{rel:"apple-touch-icon",href:"/apple-touch-icon.png"});
-    add("meta",{name:"apple-mobile-web-app-title",content:"THL時間割"});
-  }else{
-    // 学生/ワールドURL：manifestを付けない（＝iOSがURLをそのまま登録）。アイコンだけ指定
-    add("link",{rel:"apple-touch-icon",href:"/apple-touch-icon.png"});
-    add("meta",{name:"theme-color",content:"#0b6e8f"});
-    add("meta",{name:"apple-mobile-web-app-title",content:(isStudent?"THL時間割":"THL時間割")});
   }
 }catch(e){}})();
 </script>
@@ -499,7 +498,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v25</span>
+  <span class="app-ver">v26</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
