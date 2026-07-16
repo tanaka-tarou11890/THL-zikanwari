@@ -480,7 +480,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v24</span>
+  <span class="app-ver">v25</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
@@ -712,6 +712,9 @@ const WORLD_URL_KEYS={hotel:"ホテル",tour:"観光",air:"エアライン",dres
 var VIEWER_WORLD=(function(){try{const m=location.search.match(/[?&]w=([^&]+)/);if(!m)return null;
   const v=decodeURIComponent(m[1]);return WORLD_URL_KEYS[v]||v;}catch(e){return null;}})();
 var VIEWER_GRADE=(function(){try{const m=location.search.match(/[?&]g=([1-4])(?:[^0-9]|$)/);return m?+m[1]:null;}catch(e){return null;}})();
+/* 年度付き閲覧URL（?y=2026）。閲覧時にサーバーの現年度と一致しなければ案内を表示し、時間割は見せない。
+   卒業生などが古いURL・素のURLで最新年度を見続けないための仕組み。 */
+var VIEWER_YEAR=(function(){try{const m=location.search.match(/[?&]y=(\d{4})(?:[^0-9]|$)/);return m?+m[1]:null;}catch(e){return null;}})();
 /* ===== PWA ===== */
 // Service Worker登録（https時のみ。file://では何もしない）
 if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost")){
@@ -1488,6 +1491,12 @@ function printTimetable(kind){
       background:${btnColor};color:#fff;cursor:pointer;margin:0 5px;font-family:inherit}
     .noprint button.sec{background:#fff;color:${btnColor};border:1.5px solid ${btnColor}}
     @media print{body{padding:0}.noprint{display:none}.table-scroll{box-shadow:none}}
+  #yearNotice{display:none;position:fixed;inset:0;z-index:9999;background:linear-gradient(160deg,#1E5B3C 0%,#134129 100%);align-items:center;justify-content:center;padding:24px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #yearNotice .yn-card{max-width:440px;width:100%;background:#fff;border-radius:18px;padding:40px 32px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+  #yearNotice .yn-badge{font-family:"Cinzel",serif;font-weight:700;letter-spacing:.35em;color:#1E5B3C;font-size:1.1rem;margin-bottom:20px}
+  #yearNotice .yn-title{font-size:1.25rem;font-weight:800;color:#16323F;line-height:1.5;margin-bottom:16px}
+  #yearNotice .yn-msg{font-size:1rem;line-height:1.8;color:#1E5B3C;font-weight:600;margin-bottom:16px}
+  #yearNotice .yn-sub{font-size:.85rem;line-height:1.8;color:#5A6B7A}
   </style></head><body>
   <div class="noprint"><button onclick="window.print()">印刷する</button><button class="sec" onclick="window.close()">閉じる</button></div>
   ${sheets}</body></html>`);
@@ -1927,16 +1936,20 @@ function exportWorldUrls(){
   // URLは短い英字キー（hotel/tour/air/dress/planner）を優先して使う
   const K2={};Object.keys(WORLD_URL_KEYS).forEach(k=>{K2[WORLD_URL_KEYS[k]]=k;});
   const wp=sh=>K2[sh]||encodeURIComponent(sh);
-  let txt="ワールド（コース）別 時間割URL一覧\n作成: "+new Date().toLocaleString("ja-JP")+"\n";
-  txt+="※クラス時間割の公開ページを、そのワールドを選択した状態で開くURLです。誰に配っても問題ありません。\n\n";
+  const yq="y="+schoolYear; // 年度付きURL（この年度専用。翌年度になると旧URLは案内表示になる）
+  let txt="ワールド（コース）別 時間割URL一覧（"+schoolYear+"年度）\n作成: "+new Date().toLocaleString("ja-JP")+"\n";
+  txt+="※クラス時間割の公開ページを、そのワールドを選択した状態で開くURLです。在校生に配ってください。\n";
+  txt+="※これらは"+schoolYear+"年度専用のURLです。新年度に切り替えたら、新しいURLを配り直してください（古いURLは案内画面になります）。\n\n";
+  txt+="■ 閲覧トップ（学年・ワールドを自分で選ぶ）\n";
+  txt+="全体\t"+base+"/?"+yq+"\n\n";
   txt+="■ ワールド全体（全学年をまとめて表示）\n";
-  txt+=order.map(sh=>`${sh}\t${base}/?w=${wp(sh)}`).join("\n");
+  txt+=order.map(sh=>`${sh}\t${base}/?${yq}&w=${wp(sh)}`).join("\n");
   txt+="\n\n■ 学年別\n";
   [1,2,3,4].forEach(g=>{(OPT.world_by_grade[String(g)]||[]).forEach(x=>{const sh=worldShortFull(x);
-    txt+=`${g}年 ${sh}\t${base}/?w=${wp(sh)}&g=${g}\n`;});});
+    txt+=`${g}年 ${sh}\t${base}/?${yq}&w=${wp(sh)}&g=${g}\n`;});});
   const blob=new Blob([txt],{type:"text/plain;charset=utf-8"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);
-  a.download="ワールドURL一覧.txt";a.click();
+  a.download="ワールドURL一覧_"+schoolYear+"年度.txt";a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
 /* 学生ごとの閲覧URL一覧をテキストで書き出す（本人にのみ配布する） */
@@ -2586,6 +2599,11 @@ async function serverLoad(silent){
     hideSyncWarn();hideEditGate();
     const btn=document.getElementById("syncReloadBtn");if(btn){btn.style.display="";btn.onclick=()=>serverLoad(false);}
     if(j&&j.exists){
+      // 年度付き閲覧URLの照合：閲覧モードで、?y= が無い（素のURL）か、現年度と違う年度なら案内を出して中身を見せない。
+      // 学生URL（?s=）は年度非依存のため対象外。編集画面（/edit）は VIEWER_MODE=false なので影響しない。
+      if(VIEWER_MODE&&!VIEWER_STUDENT_KEY&&typeof j.year==="number"&&VIEWER_YEAR!==j.year){
+        showYearNotice(VIEWER_YEAR);return;
+      }
       lateRecords=j.lateRecords||[];
       if(Array.isArray(j.earlyRecords))earlyRecords=j.earlyRecords; // 前期もサーバー管理
       earlyEdits=j.earlyEdits||{};
@@ -2620,6 +2638,30 @@ async function serverLoad(silent){
       if(!silent)alert("サーバーに接続できませんでした。\n\n原因: "+why+"\n\nこの端末内のデータで表示します。");
     }
   }
+}
+/* 年度付き閲覧URLが現年度と違うときの案内（リンクは出さない＝卒業生が新年度をたどれないように） */
+function showYearNotice(reqYear){
+  let el=document.getElementById("yearNotice");
+  if(!el){
+    el=document.createElement("div");el.id="yearNotice";
+    el.innerHTML='<div class="yn-card">'+
+      '<div class="yn-badge">THL</div>'+
+      '<div class="yn-title">この時間割は現在ご利用いただけません</div>'+
+      '<div class="yn-msg" id="ynMsg"></div>'+
+      '<div class="yn-sub">最新の時間割をご覧になりたい在校生の方は、今年度のURLまたはQRコードを学校からの案内でご確認ください。</div>'+
+      '</div>';
+    document.body.appendChild(el);
+  }
+  document.getElementById("ynMsg").innerHTML=
+    (reqYear!==null
+      ? (reqYear+"年度の時間割ページです。<br>この年度は現在、在校生の方へ個別にご案内しています。")
+      : "このURLでは時間割を表示できません。<br>時間割は在校生の方へ、年度ごとのURLで個別にご案内しています。");
+  el.style.display="flex";
+  // 背後の画面は隠す（誤って中身が見えないように、案内以外の直下要素を非表示）
+  Array.prototype.forEach.call(document.body.children,function(ch){
+    if(ch.id!=="yearNotice")ch.style.display="none";
+  });
+  document.title="THL 時間割ツール";
 }
 /* 編集画面の未接続警告バナー */
 function showSyncWarn(msg){
