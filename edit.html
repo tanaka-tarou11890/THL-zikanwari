@@ -2088,12 +2088,40 @@ function printCourseCSS(){
 function printTimetable(kind){
   let sheets="",docTitle="",theme="accent";
   if(kind==="class"){
-    if(!cstate.grade||!cstate.world){alert("印刷するには、学年とコースを1つずつ選んで時間割を表示してください。");return;}
-    theme=worldPrintTheme(cstate.world)||(isLate()?"edit":"accent");
-    const wfull=fullWorldName(cstate.grade,cstate.world);
-    const rows=classData().filter(r=>r.grade===cstate.grade&&worldShortFull(r.world)===cstate.world);
-    docTitle=`${cstate.grade}年 ${cstate.world} 時間割`;
-    sheets=buildPrintTable(`${cstate.grade}年 ${cstate.world}`,`${schoolYear}年度 ${termLabel(term)} ／ ${wfull}`,rows,theme);
+    /* フィルターの状態に応じて印刷する範囲を決める
+        学年もコースも未選択 → 全学年×全コース
+        コースだけ選択      → そのコースの全学年
+        学年だけ選択        → その学年の全コース
+        両方選択            → その1枚だけ                      */
+    const pairs=[];
+    gradeList().forEach(g=>{
+      if(cstate.grade&&cstate.grade!==g)return;
+      (OPT.world_by_grade[String(g)]||[]).slice()
+        .sort((a,b)=>worldRank(a)-worldRank(b))
+        .forEach(w=>{
+          const sh=worldShortFull(w);
+          if(cstate.world&&cstate.world!==sh)return;
+          pairs.push({grade:g,wShort:sh});
+        });
+    });
+    if(!pairs.length){alert("印刷できる時間割がありません。");return;}
+    // 見出し（1枚のときは従来どおり、複数枚のときは範囲がわかる名前にする）
+    if(pairs.length===1){
+      docTitle=`${pairs[0].grade}年 ${pairs[0].wShort} 時間割`;
+      theme=worldPrintTheme(pairs[0].wShort)||(isLate()?"edit":"accent");
+    }else{
+      docTitle=(cstate.world?`${cstate.world} `:(cstate.grade?`${cstate.grade}年 `:"全体 "))+
+        `時間割（${schoolYear}年度 ${termLabel(term)}）`;
+      theme=cstate.world?(worldPrintTheme(cstate.world)||"accent"):(isLate()?"edit":"accent");
+    }
+    const data=classData();
+    sheets=pairs.map(pr=>{
+      const rows=data.filter(r=>r.grade===pr.grade&&worldShortFull(r.world)===pr.wShort);
+      const wfull=fullWorldName(pr.grade,pr.wShort);
+      const th=worldPrintTheme(pr.wShort)||theme;
+      return buildPrintTable(`${pr.grade}年 ${pr.wShort}`,
+        `${schoolYear}年度 ${termLabel(term)} ／ ${wfull}`,rows,th);
+    }).join('<div class="pgbreak"></div>');
   }else if(kind==="person-one"){
     const pinfo=personList().find(p=>p.name===pstate.person)||{};
     theme=worldPrintTheme(pinfo.world?worldShortFull(pinfo.world):null)||(isLate()?"edit":"person");
