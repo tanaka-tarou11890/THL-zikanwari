@@ -1858,13 +1858,17 @@ function renderEditToolbar(){
     tb.innerHTML=`<div class="edit-toolbar" style="background:var(--accent-soft);border-color:#cfe6ee">
       <span class="et-label" style="color:var(--accent)">${termLabel("early")}</span>
       <span style="font-size:.82rem;color:var(--ink-soft)">学年とコースを選ぶと、表のマスをクリックして授業を編集できます。</span>
-      <button class="btn ghost" id="checkAll" style="margin-left:auto">整合チェック</button>
+      <button class="btn ghost" id="toggleProgress" style="margin-left:auto">入力状況</button>
+      <button class="btn ghost" id="checkAll">整合チェック</button>
+      <button class="btn ghost" id="printClass">印刷</button>
       <button class="btn ok" id="exportEarlyXlsx">Excel出力</button>
       <button class="btn ghost" id="yearMenuBtnE">年度メニュー</button>
       <button class="btn ghost" id="worldUrlBtnE">コースURL一覧</button>
       <button class="btn danger-ghost" id="resetEarly">${esc(termLabel("early"))}データを消去</button>
     </div><div id="progressPanel"></div><div id="checkPanel"></div>`;
     document.getElementById("exportEarlyXlsx").onclick=exportEarlyExcel;
+    document.getElementById("toggleProgress").onclick=()=>{progressOpen=!progressOpen;if(progressOpen)checkOpen=false;renderProgress();renderCheck();};
+    document.getElementById("printClass").onclick=()=>printTimetable("class");
     document.getElementById("checkAll").onclick=()=>{checkOpen=!checkOpen;if(checkOpen)progressOpen=false;renderProgress();renderCheck();};
     const ym=document.getElementById("yearMenuBtnE");if(ym)ym.onclick=openYearMenu;
     const wu=document.getElementById("worldUrlBtnE");if(wu)wu.onclick=exportWorldUrls;
@@ -1874,7 +1878,7 @@ function renderEditToolbar(){
       if(confirm(t+"に登録したデータをすべて消去します。\n（学生別の個別時間割は消えません）\n\nこの操作は元に戻せません。よろしいですか？")){
         earlyRecords=[];saveEarlyEdits();renderClass();
         setSaved(t+"データを消去しました");}};
-    renderCheck();
+    renderProgress();renderCheck();
     return;
   }
   tb.innerHTML=`<div class="edit-toolbar">
@@ -1884,15 +1888,11 @@ function renderEditToolbar(){
     <button class="btn ghost" id="checkAll">整合チェック</button>
     <button class="btn ghost" id="printClass">印刷</button>
     <button class="btn ok" id="exportXlsx">Excel出力</button>
-    <button class="btn ghost" id="exportJson">JSON出力</button>
-    <button class="btn ghost" id="importJson">JSON読込</button>
     <button class="btn ghost" id="yearMenuBtnL">年度メニュー</button>
     <button class="btn ghost" id="worldUrlBtnL">コースURL一覧</button>
     <button class="btn danger-ghost" id="resetLate">${esc(termLabel("late"))}データを消去</button>
   </div><div id="progressPanel"></div><div id="checkPanel"></div>`;
   document.getElementById("exportXlsx").onclick=exportExcel;
-  document.getElementById("exportJson").onclick=exportJson;
-  document.getElementById("importJson").onclick=importClassJson;
   document.getElementById("resetLate").onclick=()=>{
     const t=termLabel("late");
     if(confirm(t+"に登録したデータをすべて消去します。\n（学生別の個別時間割は消えません）\n\nこの操作は元に戻せません。よろしいですか？")){
@@ -1910,11 +1910,12 @@ function renderProgress(){
   const panel=document.getElementById("progressPanel");if(!panel)return;
   if(!progressOpen){panel.innerHTML="";return;}
   // 学年×コースのマトリクス。各セルは登録コマ数。クリックでそのコースへ移動
-  const grades=[1,2,3,4];
+  // 表示中の学期のデータを対象にする
+  const grades=gradeList();
   // 全コース短縮名（出現順）
   const allShort=[];
   Object.values(OPT.world_by_grade).forEach(arr=>arr.slice().sort((a,b)=>worldRank(a)-worldRank(b)).forEach(w=>{const s=worldShortFull(w);if(!allShort.includes(s))allShort.push(s);}));
-  function cellCount(g,wShort){return lateRecords.filter(r=>r.grade===g&&worldShortFull(r.world)===wShort).length;}
+  function cellCount(g,wShort){return classData().filter(r=>r.grade===g&&worldShortFull(r.world)===wShort).length;}
   function exists(g,wShort){return (OPT.world_by_grade[String(g)]||[]).some(w=>worldShortFull(w)===wShort);}
   let total=0,filled=0;
   let thead='<tr><th class="pg-corner">学年＼コース</th>'+allShort.map(w=>`<th>${esc(w)}</th>`).join("")+'<th class="pg-sum">計</th></tr>';
@@ -3065,6 +3066,8 @@ function importClassJson(){
     saveLate();
     // 表示をリセットして反映
     cstate.grade=null;cstate.world=null;
+    offerRegisterCourses(lateRecords);   // 設定に無いコースがあれば追加を確認
+    saveLate();
     rebuildWorldChips();refreshChips("#classPanel",cstate);renderClass();
     alert(`読み込み完了：現在 ${lateRecords.length} コマになりました。`);
   });
@@ -3147,6 +3150,57 @@ let serverUpdatedAt=null;    // 最後に読み込んだサーバーデータの
 let pushTimer=null;
 
 /* 表記ゆれの自動変換は汎用版では使わない（コースはキーで保存されるため不要） */
+/* 取り込んだデータの中に、設定に無いコースが含まれていないか調べる。
+   見つかった場合は、そのコース名と、データ上の学年をまとめて返す。 */
+function unknownCoursesIn(records){
+  const found={};
+  (records||[]).forEach(r=>{
+    if(!r||!r.world)return;
+    if(courseOf(r.world))return;               // 設定にあるものは対象外
+    const name=String(r.world).trim();
+    if(!name)return;
+    (found[name]=found[name]||new Set()).add(+r.grade||1);
+  });
+  return Object.keys(found).map(name=>({name,grades:[...found[name]].sort((a,b)=>a-b)}));
+}
+/* 未登録コースを設定に追加する。追加した件数を返す */
+function addCoursesToConfig(list){
+  if(!list||!list.length)return 0;
+  const used=new Set((CFG.courses||[]).map(c=>c.urlKey||c.key));
+  let added=0;
+  list.forEach(item=>{
+    let i=1;while((CFG.courses||[]).some(c=>c.key==="c"+i))i++;
+    const key="c"+i;
+    let uk=key;while(used.has(uk))uk=key+"_"+Math.random().toString(36).slice(2,5);
+    used.add(uk);
+    // 表示名は括弧や「ワールド」を落とした短い形にする
+    const short=item.name.replace(/（[^）]*）/g,"").replace(/【[^】]*】/g,"").replace(/ワールド/g,"").trim()||item.name;
+    CFG.courses.push({key:key,short:short,full:item.name,
+      color:CFG_PALETTE[(CFG.courses||[]).length%CFG_PALETTE.length],
+      urlKey:uk,grades:item.grades,fullByGrade:null});
+    added++;
+  });
+  if(added){applyCFG();applyBranding();rebuildFromCFG();saveCfgLocal();}
+  return added;
+}
+/* 取り込み直後に呼ぶ：未登録コースがあれば、設定に追加するか確認する */
+function offerRegisterCourses(records){
+  const unknown=unknownCoursesIn(records);
+  if(!unknown.length)return 0;
+  const lines=unknown.map(u=>`・${u.name}（${u.grades.join("・")}年）`).join("\n");
+  const msg=`読み込んだデータに、設定に登録されていないコースが ${unknown.length}件 ありました。\n\n${lines}\n\n`+
+    `このまま設定に追加すると、コースの絞り込みボタンに表示され、色や正式名称も設定できるようになります。\n追加しますか？\n（「キャンセル」を選ぶと、時間割には表示されますが絞り込みはできません）`;
+  if(!confirm(msg))return 0;
+  const n=addCoursesToConfig(unknown);
+  if(n){
+    // 追加したコースのキーへデータを揃える
+    const fix=o=>{if(!o||!o.world)return;const c=courseOf(o.world);if(c&&o.world!==c.key)o.world=c.key;};
+    (earlyRecords||[]).forEach(fix);(lateRecords||[]).forEach(fix);(latePersons||[]).forEach(fix);
+    schedulePush();
+    alert(`${n}件のコースを設定に追加しました。\n「設定」タブから、表示名・色・対象の学年を調整できます。`);
+  }
+  return n;
+}
 function normalizeNotation(){}
 /* 旧バージョンのデータはコースを「正式名称の文字列」で持っている。
    設定のコース（学年別の正式名称を含む）と照合して、内部キーへ一度だけ変換する。 */
@@ -3213,6 +3267,11 @@ function ymImport(){
         const d=JSON.parse(reader.result);
         if(!confirm("読み込んだデータで現在の内容を置き換えます。よろしいですか？"))return;
         if(typeof d.year==="number"){schoolYear=d.year;saveYearLocal();}
+        // 書き出したJSONに設定が入っていれば、それも復元する
+        if(d.config&&typeof d.config==="object"){
+          CFG=Object.assign(defaultCFG(),d.config);
+          applyCFG();applyBranding();rebuildFromCFG();saveCfgLocal();
+        }
         earlyRecords=Array.isArray(d.earlyRecords)?d.earlyRecords:[];
         lateRecords=Array.isArray(d.lateRecords)?d.lateRecords:[];
         latePersons=Array.isArray(d.latePersons)?d.latePersons:[];
@@ -3224,6 +3283,7 @@ function ymImport(){
           localStorage.setItem(STORE_PKEY,JSON.stringify(latePersons));
           localStorage.setItem(STORE_PREC,JSON.stringify(lateP));
         }catch(e){}
+        offerRegisterCourses([...earlyRecords,...lateRecords]);  // 設定に無いコースがあれば追加を確認
         updateYearBadge();renderAll();closeYearMenu();
         schedulePush();
         setSaved(schoolYear+"年度データを読み込みました");
