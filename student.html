@@ -486,7 +486,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v27</span>
+  <span class="app-ver">v28</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
@@ -818,13 +818,14 @@ function saveEarlyEdits(){try{localStorage.setItem("thl_zenki_records_v1",JSON.s
 loadEarlyEdits();
 function earlyEditCount(){return earlyRecords.length;}
 function earlyData(){return earlyRecords;}
-let earlyEditMode=false; // 前期で編集モードがONか
+let earlyEditMode=true; // 旧仕様の名残（前期も常に編集可能）
 
 // 現在データ（学期で切替）
 function classData(){return term==="early"?earlyData():lateRecords;}
 function isLate(){return term==="late";}
 // 編集可能か（後期は常時、前期は編集モードON時）
-function isEditable(){return !VIEWER_MODE&&(term==="late"||(term==="early"&&earlyEditMode));}
+/* 前期・後期とも同じ扱い：編集画面ならどちらも編集できる */
+function isEditable(){return !VIEWER_MODE;}
 
 // ===== ユーティリティ =====
 function esc(s){return (s||"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));}
@@ -1177,18 +1178,15 @@ function renderEditToolbar(){
   const tb=document.getElementById("editToolbar");
   if(VIEWER_MODE){tb.innerHTML="";return;}
   if(!isLate()){
-    // 前期：編集モードのトグルと元に戻す
-    const cnt=earlyEditCount();
-    tb.innerHTML=`<div class="edit-toolbar" style="background:${earlyEditMode?'var(--accent-soft)':'#fff'};border-color:${earlyEditMode?'#cfe6ee':'var(--line)'}">
-      <span class="et-label" style="color:${earlyEditMode?'var(--accent)':'var(--ink-soft)'}">前期${earlyEditMode?' 編集モード':''}</span>
-      <span style="font-size:.82rem;color:var(--ink-soft)">${earlyEditMode?'表のマスをクリックして授業を編集できます。':'前期の内容を直したいときは「編集する」をオンにします。'}${cnt?`（編集 ${cnt} 件）`:''}</span>
-      <button class="btn ${earlyEditMode?'edit':'ghost'}" id="toggleEarlyEdit" style="margin-left:auto">${earlyEditMode?'編集を終了':'編集する'}</button>
-      <button class="btn ghost" id="checkAll">整合チェック</button>
+    // 前期：後期と同じ操作感（常に編集できる）
+    tb.innerHTML=`<div class="edit-toolbar" style="background:var(--accent-soft);border-color:#cfe6ee">
+      <span class="et-label" style="color:var(--accent)">前期</span>
+      <span style="font-size:.82rem;color:var(--ink-soft)">学年とワールドを選ぶと、表のマスをクリックして授業を編集できます。</span>
+      <button class="btn ghost" id="checkAll" style="margin-left:auto">整合チェック</button>
       <button class="btn ok" id="exportEarlyXlsx">Excel出力</button>
       <button class="btn ghost" id="yearMenuBtnE">年度メニュー</button>
       <button class="btn ghost" id="worldUrlBtnE">ワールドURL一覧</button>
     </div><div id="progressPanel"></div><div id="checkPanel"></div>`;
-    document.getElementById("toggleEarlyEdit").onclick=()=>{earlyEditMode=!earlyEditMode;renderClass();};
     document.getElementById("exportEarlyXlsx").onclick=exportEarlyExcel;
     document.getElementById("checkAll").onclick=()=>{checkOpen=!checkOpen;if(checkOpen)progressOpen=false;renderProgress();renderCheck();};
     const ym=document.getElementById("yearMenuBtnE");if(ym)ym.onclick=openYearMenu;
@@ -1547,8 +1545,8 @@ function renderClass(){
         out.innerHTML='<div class="empty"><div class="big">学年とワールドを選んでください</div><div>後期の授業をマス目に入力していきます。</div></div>';return;}
       note.innerHTML='<div class="mode-note"><b>後期</b>　学年とワールドを選ぶと、後期の週間表を表示します。</div>';
       out.innerHTML='<div class="empty"><div class="big">学年とワールドを選んでください</div></div>';return;}
-    if(earlyEditMode){note.innerHTML='<div class="mode-note e"><b>前期 編集モード</b>　学年とワールドを選ぶと、編集できる週間表が開きます。</div>';
-      out.innerHTML='<div class="empty"><div class="big">学年とワールドを選んでください</div></div>';return;}
+    if(isEditable()){note.innerHTML='<div class="mode-note e"><b>前期</b>　学年とワールドを選ぶと、編集できる週間表が開きます。</div>';
+      out.innerHTML='<div class="empty"><div class="big">学年とワールドを選んでください</div><div>前期の授業をマス目に入力していきます。</div></div>';return;}
     note.innerHTML="";out.innerHTML='<div class="empty"><div class="big">該当する授業がありません</div></div>';return;}
   if(gset.size===1&&wset.size===1){
     const noteCls=isEditable()?"e":"";
@@ -2435,7 +2433,7 @@ function setTerm(t){term=t;
   setSaved(t==="late"?(lateRecords.length?`後期データ ${lateRecords.length}コマ`:"後期：未入力"):(earlyEditCount()?`前期 編集 ${earlyEditCount()}件`:""));
   // 名簿は学期共通になったため、選択中の学生はそのまま保つ（在籍していなければ解除）
   if(pstate.person&&!personList().some(p=>p.name===pstate.person))pstate.person=null;
-  earlyEditMode=false; // 学期を切り替えたら前期編集モードはオフに戻す
+  // 前期・後期とも常に編集できるため、モードの切り替えは不要
   rebuildWorldChips();rebuildPersonPick();
   rstate.room=null;
   rebuildRoomPick();
