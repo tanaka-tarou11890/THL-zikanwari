@@ -3,15 +3,36 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<!-- PWA：ホーム画面に追加するとアプリとして動作する -->
+<!-- PWA：閲覧トップ（?s=や?w=が無いとき）だけmanifestを付ける。
+     iOSは<head>解析時にmanifestを読むため、学生/コースURLでは最初から書かないことでURL短縮を防ぐ -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="manifest" href="/manifest-edit.json">
 <meta name="theme-color" content="#7a4ea8">
 <link rel="apple-touch-icon" href="/apple-touch-icon-edit.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="THL編集">
+<script>
+(function(){try{
+  var q=location.search||"";
+  var isStudent=/[?&]s=/.test(q);
+  var isWorld=/[?&]w=/.test(q);
+  var isYear=/[?&]y=/.test(q);
+  var head=document.head||document.getElementsByTagName("head")[0];
+  function add(tag,attrs){var e=document.createElement(tag);for(var k in attrs)e.setAttribute(k,attrs[k]);head.appendChild(e);}
+  // パラメータ付き（年度・学生・コース）のURLは manifest を付けない。
+  // → iOSでもホーム画面に「今開いているURL（?y=2026 など）」がそのまま登録され、アイコンから正しく開ける。
+  //   manifest を付けると start_url に固定され、年度付きURLが保存されない不具合になる。
+  add("meta",{name:"theme-color",content:"#0b6e8f"});
+  add("link",{rel:"apple-touch-icon",href:"/apple-touch-icon.png"});
+  add("meta",{name:"apple-mobile-web-app-title",content:"時間割"});
+  if(!isStudent&&!isWorld&&!isYear){
+    // パラメータの無い素の "/" だけ、閲覧アプリの manifest を付ける（この画面は年度案内になる）
+    add("link",{rel:"manifest",href:"/manifest.json"});
+  }
+}catch(e){}})();
+</script>
 
-<title>THL 時間割ツール — 2026年度</title>
+<title>時間割ツール</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <style>
   :root{
@@ -136,7 +157,7 @@
   table.week thead th.corner{background:#0a5570}
   table.week.p thead th.corner{background:#075a4d}
   table.week.e thead th.corner{background:var(--edit-d)}
-  /* ワールド別カラー（印刷と同じ配色）：ホテル=深緑／観光=黄／エアライン=水色／ブライダル=ピンク */
+  /* コース別カラー（印刷と同じ配色）：ホテル=深緑／観光=黄／エアライン=水色／ブライダル=ピンク */
   table.week.w-hotel thead th{background:#1E5B3C;color:#fff}
   table.week.w-hotel thead th.corner{background:#14432C}
   table.week.w-hotel td.period-cell{background:#E4F0E9;color:#1B4A31}
@@ -333,7 +354,7 @@
   .modal .mfield input:focus{outline:none;border-color:var(--edit);box-shadow:0 0 0 3px var(--edit-soft)}
   .modal .mactions{display:flex;gap:10px;margin-top:6px}
   .modal .mactions .btn{flex:1}
-  /* 学年・ワールド選択セグメント */
+  /* 学年・コース選択セグメント */
   .seg{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
   .seg .opt{font-size:.9rem;font-weight:600;padding:9px 16px;border:2px solid var(--line);
     background:#fff;border-radius:10px;cursor:pointer;color:var(--ink-soft);
@@ -468,17 +489,128 @@
     .edit-toolbar .btn{min-width:100%}
     table.week{min-width:500px}
   }
+
+  /* ===== 設定画面（カード式・フォーム調） ===== */
+  #configView{background:#F1F3F4;margin:-2px -2px 0;padding:20px 14px 40px;border-radius:12px}
+  .cfg-shell{max-width:760px;margin:0 auto}
+  .cfg-nav{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 12px;scrollbar-width:thin}
+  .cfg-nav button{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;
+    border:1px solid #DADCE0;background:#fff;border-radius:22px;padding:8px 15px;
+    font:inherit;font-size:.85rem;font-weight:600;color:#5F6368;cursor:pointer;transition:.14s}
+  .cfg-nav button:hover{background:#F8F9FA;border-color:#C6C9CD}
+  .cfg-nav button.on{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 1px 4px rgba(11,110,143,.3)}
+  .cfg-nav .nv-sum{font-size:.72rem;opacity:.7;font-weight:500}
+  .cfg-nav .nv-dot{width:7px;height:7px;border-radius:50%;background:#F5A623;flex:none;display:none}
+  .cfg-nav button.dirty .nv-dot{display:block}
+  /* カード（Googleフォームの設問カードに相当） */
+  .fcard{background:#fff;border:1px solid #DADCE0;border-radius:10px;padding:22px 24px;margin-bottom:14px;
+    border-left:5px solid transparent;transition:.14s}
+  .fcard:focus-within{border-left-color:var(--accent);box-shadow:0 1px 6px rgba(60,64,67,.18)}
+  .fcard-t{font-size:1.12rem;font-weight:600;color:#202124;margin:0 0 6px}
+  .fcard-d{font-size:.83rem;color:#5F6368;line-height:1.75;margin-bottom:20px}
+  /* 下線だけの入力欄 */
+  .ff{margin-bottom:20px}
+  .ff:last-child{margin-bottom:0}
+  .ff>label{display:block;font-size:.76rem;color:#5F6368;font-weight:600;margin-bottom:5px}
+  .ff input[type=text],.ff select,.ff textarea{
+    width:100%;border:none;border-bottom:1px solid #DADCE0;border-radius:0;background:transparent;
+    padding:7px 2px;font:inherit;font-size:.95rem;color:#202124;transition:.14s}
+  .ff input[type=text]:focus,.ff select:focus,.ff textarea:focus{outline:none;border-bottom:2px solid var(--accent);padding-bottom:6px}
+  .ff input[type=text]::placeholder,.ff textarea::placeholder{color:#BDC1C6}
+  .ff textarea{min-height:120px;resize:vertical;line-height:1.7;border:1px solid #DADCE0;border-radius:8px;padding:10px 12px}
+  .ff textarea:focus{border:2px solid var(--accent);padding:9px 11px}
+  .ff select{appearance:none;background:transparent;cursor:pointer}
+  .ff-row{display:grid;gap:18px;grid-template-columns:1fr 1fr}
+  .ff-row .ff{margin-bottom:0}
+  /* 選択チップ */
+  .cfg-toggles{display:flex;gap:8px;flex-wrap:wrap}
+  .cfg-tg{border:1px solid #DADCE0;border-radius:20px;padding:7px 16px;cursor:pointer;user-select:none;
+    font-size:.86rem;font-weight:600;color:#5F6368;background:#fff;transition:.14s}
+  .cfg-tg:hover{background:#F8F9FA}
+  .cfg-tg.on{background:var(--accent-soft,#E4F0F5);border-color:var(--accent);color:var(--accent)}
+  /* 追加ボタン */
+  .cfg-add{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:4px;
+    background:#fff;color:var(--accent);border:1px dashed #B9C0C6;border-radius:10px;
+    padding:14px;font:inherit;font-weight:600;font-size:.9rem;cursor:pointer;transition:.14s}
+  .cfg-add:hover{background:#F8FBFC;border-color:var(--accent)}
+  /* 時限テーブル */
+  .cfg-ptable{width:100%;border-collapse:collapse;font-size:.9rem}
+  .cfg-ptable th{color:#5F6368;font-size:.72rem;padding:0 10px 8px 0;text-align:left;font-weight:600;border-bottom:1px solid #E8EAED}
+  .cfg-ptable td{border-bottom:1px solid #F1F3F4;padding:9px 10px 9px 0;vertical-align:middle}
+  .cfg-ptable input[type=time]{border:none;border-bottom:1px solid #DADCE0;background:transparent;
+    padding:5px 2px;font:inherit;font-size:.92rem;color:#202124}
+  .cfg-ptable input[type=time]:focus{outline:none;border-bottom:2px solid var(--accent)}
+  .cfg-ptable .pn{font-weight:600;color:#202124;white-space:nowrap}
+  .iconbtn{background:transparent;border:none;color:#80868B;cursor:pointer;border-radius:50%;
+    width:30px;height:30px;font-size:.82rem;transition:.14s;line-height:1}
+  .iconbtn:hover{background:#F1F3F4;color:#202124}
+  .iconbtn.dg:hover{background:#FCE8E6;color:#C5221F}
+  /* コースカード */
+  .ccard{border:1px solid #DADCE0;border-radius:10px;margin-bottom:12px;overflow:hidden;background:#fff}
+  .ccard-head{display:flex;align-items:center;gap:10px;padding:11px 14px;font-weight:600;font-size:.95rem}
+  .ccard-head .ch-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ccard-head .ch-cnt{font-size:.74rem;opacity:.85;font-weight:500}
+  .ccard-head .iconbtn{color:inherit;opacity:.8}
+  .ccard-head .iconbtn:hover{background:rgba(255,255,255,.24);color:inherit;opacity:1}
+  .ccard-body{padding:18px}
+  .ccard-body .ff-row{margin-bottom:18px}
+  .swatch{display:flex;align-items:center;gap:10px}
+  .swatch input[type=color]{width:46px;height:34px;border:1px solid #DADCE0;border-radius:6px;background:#fff;padding:2px;cursor:pointer}
+  .swatch span{font-size:.78rem;color:#5F6368;font-family:monospace}
+  /* プレビュー */
+  .cfg-prev{border:1px solid #E8EAED;border-radius:8px;overflow:hidden;font-size:.74rem;margin-top:6px}
+  .cfg-prev .pv-h{display:flex}
+  .cfg-prev .pv-h>div{flex:1;padding:6px 4px;text-align:center;font-weight:700}
+  .cfg-prev .pv-h>div.pv-corner{flex:none;width:58px}
+  .cfg-prev .pv-b{display:flex}
+  .cfg-prev .pv-b .pv-side{width:58px;padding:8px 4px;text-align:center;font-weight:700;flex:none}
+  .cfg-prev .pv-b .pv-cell{flex:1;padding:8px 10px;background:#fff;color:#5F6368}
+  /* 教室タグ */
+  .chipbox{border:1px solid #DADCE0;border-radius:10px;padding:12px;display:flex;flex-wrap:wrap;gap:8px;background:#fff;min-height:56px}
+  .chipbox:focus-within{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+  .rchip{display:inline-flex;align-items:center;gap:5px;border-radius:18px;padding:6px 6px 6px 14px;
+    font-size:.86rem;font-weight:600;background:#F1F3F4;color:#3C4043;border:1px solid transparent}
+  .rchip.sp{background:#F3E8FD;color:#5B3B7A;border-color:#E5D4F5}
+  .rchip .rc-n{font-size:.68rem;opacity:.6;font-weight:500}
+  .rchip .rc-sp,.rchip .rc-x,.rchip .rc-mv{cursor:pointer;user-select:none;line-height:1}
+  .rchip .rc-sp{font-size:.66rem;opacity:.75;border:1px solid currentColor;border-radius:4px;padding:1px 4px}
+  .rchip .rc-sp:hover{opacity:1}
+  .rchip .rc-mv{opacity:.4;font-size:.66rem}
+  .rchip .rc-mv:hover{opacity:.85}
+  .rchip .rc-x{opacity:.5;font-weight:700;padding:0 4px;font-size:.95rem}
+  .rchip .rc-x:hover{opacity:1;color:#C5221F}
+  .chipbox input{border:none;outline:none;font:inherit;font-size:.92rem;flex:1;min-width:150px;padding:6px 4px;background:transparent}
+  /* 保存バー */
+  .cfg-save{display:flex;gap:12px;align-items:center;position:sticky;bottom:0;z-index:5;
+    background:#F1F3F4;padding:14px 0 4px;margin-top:6px;border-top:1px solid #E0E2E4}
+  .cfg-err{color:#C5221F;font-size:.84rem;font-weight:600}
+  .cfg-dirtynote{font-size:.8rem;color:#996A00;font-weight:600}
+  @media (max-width:700px){
+    #configView{padding:14px 8px 30px}
+    .fcard{padding:18px 16px}
+    .ff-row{grid-template-columns:1fr;gap:16px}
+  }
+  /* 年度案内・準備中の全画面表示 */
   #yearNotice{display:none;position:fixed;inset:0;z-index:9999;background:linear-gradient(160deg,#1E5B3C 0%,#134129 100%);align-items:center;justify-content:center;padding:24px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   #yearNotice .yn-card{max-width:440px;width:100%;background:#fff;border-radius:18px;padding:40px 32px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.25)}
   #yearNotice .yn-badge{font-family:"Cinzel",serif;font-weight:700;letter-spacing:.35em;color:#1E5B3C;font-size:1.1rem;margin-bottom:20px}
   #yearNotice .yn-title{font-size:1.25rem;font-weight:800;color:#16323F;line-height:1.5;margin-bottom:16px}
   #yearNotice .yn-msg{font-size:1rem;line-height:1.8;color:#1E5B3C;font-weight:600;margin-bottom:16px}
   #yearNotice .yn-sub{font-size:.85rem;line-height:1.8;color:#5A6B7A}
+  /* セットアップ */
+  .setup-overlay{display:none;position:fixed;inset:0;z-index:9998;background:#F1F3F4;overflow:auto;padding:0}
+  .setup-overlay.show{display:block}
+  .setup-card{max-width:760px;margin:0 auto;padding:0 14px 40px}
+  .setup-head{background:#fff;border:1px solid #DADCE0;border-top:8px solid var(--accent);
+    border-radius:10px;padding:26px 24px;margin:24px 0 14px}
+  .setup-badge{font-family:"Cinzel",serif;letter-spacing:.3em;color:var(--accent);font-weight:700;font-size:.76rem}
+  .setup-head h2{margin:8px 0 10px;font-size:1.6rem;color:#202124;font-weight:500}
+  .setup-head p{font-size:.88rem;color:#5F6368;line-height:1.8;margin:0}
 </style>
 </head>
 <body>
 <header id="appHeader"><div class="wrap">
-  <h1>THL 時間割ツール</h1>
+  <h1>時間割ツール</h1>
   <span class="year-badge" id="yearBadge"></span>
   <div class="term-toggle">
     <button id="termEarly" class="on">前期</button>
@@ -487,7 +619,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v28</span>
+  <span class="app-ver">v29</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
@@ -497,7 +629,7 @@
 </div></div>
 <div id="editGate" style="display:none">
   <div class="gate-card">
-    <div class="gate-title">THL 時間割ツール</div>
+    <div class="gate-title" id="gateTitle">時間割ツール</div>
     <div class="gate-sub">編集画面に入るには、編集パスワードが必要です</div>
     <input type="password" id="gatePw" placeholder="編集パスワード（半角英数字・記号）" autocomplete="current-password">
     <button class="btn" id="gateBtn">編集画面を開く</button>
@@ -539,8 +671,8 @@
     <h3>この枠を他のコマへコピー</h3>
     <div class="ym-sub" id="scSource"></div>
     <div class="ym-sec">
-      <div class="ym-t">コピー先のワールド（複数選択可）</div>
-      <div class="ym-d">同じ学年の他のワールドにも、同じ内容をまとめて登録できます（英会話などの合同授業に便利です）。</div>
+      <div class="ym-t">コピー先のコース（複数選択可）</div>
+      <div class="ym-d">同じ学年の他のコースにも、同じ内容をまとめて登録できます（英会話などの合同授業に便利です）。</div>
       <div class="chips" id="scWorlds"></div>
     </div>
     <div class="ym-sec">
@@ -557,7 +689,7 @@
 
 <div id="lockScreen" style="display:none">
   <div class="lock-box">
-    <div class="lock-title">THL 時間割ツール<span>編集画面</span></div>
+    <div class="lock-title" id="lockTitle">時間割ツール<span>編集画面</span></div>
     <p class="lock-desc">編集画面に入るには、編集パスワードが必要です。</p>
     <input type="password" id="lockPw" placeholder="編集パスワード（半角）" autocomplete="off">
     <div class="lock-err" id="lockErr" style="display:none"></div>
@@ -573,6 +705,7 @@
     <div class="tab" data-tab="free">空き教室</div>
     <div class="tab" data-tab="slot">時限別一覧</div>
     <div class="tab" data-tab="room">教室別</div>
+    <div class="tab" data-tab="config" id="tabConfig" style="display:none">設定</div>
   </div>
 
   <div id="classView">
@@ -580,7 +713,7 @@
       <div class="search-row"><input type="text" id="q" placeholder="科目名・教員名・教室で検索（例：英会話、宮崎、501）" autocomplete="off"><button class="clear" id="clearBtn">条件をクリア</button></div>
       <div class="filters">
         <div class="filter-label">学年</div><div class="chips" id="gradeChips"></div>
-        <div class="filter-label">ワールド</div><div class="chips" id="worldChips"></div>
+        <div class="filter-label">コース</div><div class="chips" id="worldChips"></div>
         <div class="filter-label">曜日</div><div class="chips" id="dayChips"></div>
         <div class="filter-label">時限</div><div class="chips" id="periodChips"></div>
       </div>
@@ -626,6 +759,21 @@
     </div>
     <div id="roomNote"></div><div id="roomOut"></div>
   </div>
+
+  <div id="configView" style="display:none">
+    <div class="panel"><div id="cfgBody"></div></div>
+  </div>
+</div>
+
+<div class="setup-overlay" id="setupWizard">
+  <div class="setup-card">
+    <div class="setup-head">
+      <div class="setup-badge">SETUP</div>
+      <h2>はじめの設定</h2>
+      <p>このツールを使うために、学校の情報を登録します。あとから「設定」タブでいつでも変更できます。</p>
+    </div>
+    <div id="setupBody"></div>
+  </div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -658,7 +806,7 @@
       <div class="seg" id="spGradeSeg"></div>
     </div>
     <div class="mfield">
-      <label>所属ワールド <span class="sel-note">（任意・選ぶとクラス時間割を引き継ぎます）</span></label>
+      <label>所属コース <span class="sel-note">（任意・選ぶとクラス時間割を引き継ぎます）</span></label>
       <div class="sel-current-line" id="spWorldCur">所属なし</div>
       <div class="seg" id="spWorldSeg"></div>
     </div>
@@ -714,10 +862,11 @@
 var VIEWER_MODE=(location.protocol!=="file:")&&(location.pathname.indexOf("/edit")===-1)&&(location.search.indexOf("edit")===-1);
 /* 閲覧版の学生用キー（?s=XXXX）。あれば学生別タブに本人の時間割だけを表示する */
 var VIEWER_STUDENT_KEY=(function(){try{const m=location.search.match(/[?&]s=([a-z0-9]+)/i);return m?m[1]:null;}catch(e){return null;}})();
-/* ワールド用URL（?w=hotel など）：開いた時からそのワールドの時間割を表示する */
-const WORLD_URL_KEYS={hotel:"ホテル",tour:"観光",air:"エアライン",dress:"ブライダル(ドレス)",planner:"ブライダル(プランナー)"};
+/* コース用URL（?w=hotel など）：開いた時からそのコースの時間割を表示する */
+/* コースURL（?w=）の値。設定の読み込み前なので、ここでは生の文字列のまま保持し、
+   設定が届いてから applyViewerSelection() で表示名に解決する。 */
 var VIEWER_WORLD=(function(){try{const m=location.search.match(/[?&]w=([^&]+)/);if(!m)return null;
-  const v=decodeURIComponent(m[1]);return WORLD_URL_KEYS[v]||v;}catch(e){return null;}})();
+  return decodeURIComponent(m[1]);}catch(e){return null;}})();
 var VIEWER_GRADE=(function(){try{const m=location.search.match(/[?&]g=([1-4])(?:[^0-9]|$)/);return m?+m[1]:null;}catch(e){return null;}})();
 /* 年度付き閲覧URL（?y=2026）。閲覧時にサーバーの現年度と一致しなければ案内を表示し、時間割は見せない。
    卒業生などが古いURL・素のURLで最新年度を見続けないための仕組み。 */
@@ -727,14 +876,14 @@ var VIEWER_YEAR=(function(){try{const m=location.search.match(/[?&]y=(\d{4})(?:[
 if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost")){
   window.addEventListener("load",()=>{navigator.serviceWorker.register("/sw.js").catch(()=>{});});
 }
-// （PWAの自動復帰は廃止。学生URL/ワールドURLは ?s= / ?w= 付きで直接ホーム画面に登録されるため不要。
+// （PWAの自動復帰は廃止。学生URL/コースURLは ?s= / ?w= 付きで直接ホーム画面に登録されるため不要。
 //  過去バージョンで保存された記憶が残っていれば消しておく）
-try{localStorage.removeItem("thl_pwa_last");}catch(e){}
+try{localStorage.removeItem("tt_pwa_last");}catch(e){}
 /* 年度（例：2026）。サーバーに保存され、書き出し・新年度作成の単位になる */
-let schoolYear=(function(){try{const s=localStorage.getItem("thl_year_v1");if(s)return parseInt(s,10);}catch(e){}
+let schoolYear=(function(){try{const s=localStorage.getItem("tt_year_v1");if(s)return parseInt(s,10);}catch(e){}
   // 初期値：4月以降はその年、1〜3月は前年を年度とする
   const now=new Date();return now.getMonth()>=3?now.getFullYear():now.getFullYear()-1;})();
-function saveYearLocal(){try{localStorage.setItem("thl_year_v1",String(schoolYear));}catch(e){}}
+function saveYearLocal(){try{localStorage.setItem("tt_year_v1",String(schoolYear));}catch(e){}}
 function updateYearBadge(){const el=document.getElementById("yearBadge");if(el)el.textContent=schoolYear+"年度";}
 /* 学生キーの発行（ランダム12文字。URL判定と衝突しないよう "edit" を含む場合は作り直し） */
 function genKey(){const cs="abcdefghijklmnopqrstuvwxyz0123456789";let s="";
@@ -743,18 +892,532 @@ function genKey(){const cs="abcdefghijklmnopqrstuvwxyz0123456789";let s="";
   return s;}
 /* キーの無い学生に自動発行する（編集画面でのみ使用）。追加した数を返す */
 function ensureStudentKeys(){let n=0;(latePersons||[]).forEach(p=>{if(p&&!p.key){p.key=genKey();n++;}});return n;}
-const GEN=[{"grade": 1, "world": "ホテルワールド（3年制・4年制）", "day": "月", "period": 1, "time": "９：００～１０：３０", "subject": "サービス基礎（A）", "teacher": "宮崎 辰", "room": "バンケットルーム", "note": ""}, {"grade": 1, "world": "ホテルワールド（3年制・4年制）", "day": "水", "period": 1, "time": "９：００～１０：３０", "subject": "マネジメント入門Ⅰ", "teacher": "亀山 和也", "room": "403・4", "note": ""}, {"grade": 1, "world": "ホテルワールド（3年制・4年制）", "day": "木", "period": 1, "time": "９：００～１０：３０", "subject": "ホテル接客基礎", "teacher": "田隝 益美", "room": "403・4", "note": ""}, {"grade": 1, "world": "ホテルワールド（3年制・4年制）", "day": "金", "period": 1, "time": "９：００～１０：３０", "subject": "サービストレーニング", "teacher": "宮崎 辰", "room": "バンケットルーム", "note": ""}, {"grade": 1, "world": "ホテルワールド（3年制・4年制）", "day": "月", "period": 2, "time": "１０：４０～１２：１０", "subject": "サービス基礎（A）", "teacher": "宮崎 辰", "room": "バンケットルーム", "note": ""}, {"grade": 1, "world": "ホテルワールド（3年制・4年制）", "day": "火", "period": 2, "time": "１０：４０～１２：１０", "subject": "英会話Ⅰ", "teacher": "A：304", "room": "B1：501 / B2：502", "note": "C1：503 / C2：504"}, {"grade": 1, "world": "ホテルワールド（3年制・4年制）", "day": "水", "period": 2, "time": "１０：４０～１２：１０", "subject": "英会話Ⅰ", "teacher": "A：304", "room": "B1：501 / B2：502", "note": "C1：503 / C2：504"}, {"grade": 1, "world": "ホテルワールド（3年制・4年制）", "day": "木", "period": 2, "time": "１０：４０～１２：１０", "subject": "ホテルビジネス", "teacher": "石原 健", "room": "303", "note": ""}, {"grade": 1, "world": "ホテルワールド（3年制・4年制）", "day": "金", "period": 2, "time": "１０：４０～１２：１０", "subject": "サービストレーニング", "teacher": "宮崎 辰", "room": "バンケットルーム", "note": ""}, {"grade": 1, "world": "ホテルワールド（3年制・4年制）", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "サービス基礎（B）", "teacher": "宮崎 辰", "room": "バンケットルーム", "note": ""}, {"grade": 1, "world": "ホテルワールド（3年制・4年制）", "day": "火", "period": 3, "time": "１３：0０～１４：３０", "subject": "宿泊入門", "teacher": "小池 美穂", "room": "504", "note": ""}, {"grade": 1, "world": "ホテルワールド（3年制・4年制）", "day": "水", "period": 3, "time": "１３：0０～１４：３０", "subject": "IT基礎知識Ⅰ", "teacher": "田村 勇樹 / 403・4", "room": "地域コンシェルジュ 【不定期授業】", "note": "竹内 秀次郎 / 403・4"}, {"grade": 1, "world": "ホテルワールド（3年制・4年制）", "day": "木", "period": 3, "time": "１３：0０～１４：３０", "subject": "英会話Ⅰ", "teacher": "A：304", "room": "B1：501 / B2：502", "note": "C1：503 / C2：504"}, {"grade": 1, "world": "ホテルワールド（3年制・4年制）", "day": "金", "period": 3, "time": "１３：0０～１４：３０", "subject": "英会話Ⅰ", "teacher": "A：304", "room": "B1：501 / B2：502", "note": "C1：503 / C2：504"}, {"grade": 1, "world": "ホテルワールド（3年制・4年制）", "day": "月", "period": 4, "time": "１４：４０～１６：１０", "subject": "サービス基礎（B）", "teacher": "宮崎 辰", "room": "バンケットルーム", "note": ""}, {"grade": 1, "world": "ホテルワールド（3年制・4年制）", "day": "木", "period": 4, "time": "１４：４０～１６：１０", "subject": "キャリアプログラムⅠ", "teacher": "担任", "room": "403・4", "note": ""}, {"grade": 1, "world": "ホテルワールド（3年制・4年制）", "day": "金", "period": 4, "time": "１４：４０～１６：１０", "subject": "ホスピタリティコミュニケーション", "teacher": "城 万紀子", "room": "403・4", "note": "10回"}, {"grade": 1, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "火", "period": 1, "time": "９：００～１０：３０", "subject": "ブライダルの演出", "teacher": "武田 絢子", "room": "402", "note": ""}, {"grade": 1, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "水", "period": 1, "time": "９：００～１０：３０", "subject": "IT基礎知識", "teacher": "田村 勇樹", "room": "401", "note": "（エア・観 合同）"}, {"grade": 1, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "月", "period": 2, "time": "１０：４０～１２：１０", "subject": "表現力コミュニケーション", "teacher": "井上 勝馬", "room": "ビューティールーム", "note": ""}, {"grade": 1, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "火", "period": 2, "time": "１０：４０～１２：１０", "subject": "フラワーコーディネート", "teacher": "星 麻美", "room": "ビューティールーム", "note": ""}, {"grade": 1, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "金", "period": 2, "time": "１０：４０～１２：１０", "subject": "服飾史", "teacher": "櫻井 まどか", "room": "401", "note": ""}, {"grade": 1, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "異文化理解", "teacher": "小池 美穂", "room": "402", "note": ""}, {"grade": 1, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "火", "period": 3, "time": "１３：0０～１４：３０", "subject": "セルフメイク", "teacher": "関本 利恵", "room": "ビューティールーム", "note": ""}, {"grade": 1, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "水", "period": 3, "time": "１３：0０～１４：３０", "subject": "Self Development", "teacher": "石垣 利恵", "room": "ビューティールーム", "note": "【不定期】"}, {"grade": 1, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "木", "period": 3, "time": "１３：0０～１４：３０", "subject": "サービス基礎", "teacher": "八芳園", "room": "バンケットルーム", "note": ""}, {"grade": 1, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "金", "period": 3, "time": "１３：0０～１４：３０", "subject": "ドレススタイリング", "teacher": "櫻井 まどか", "room": "ビューティールーム", "note": ""}, {"grade": 1, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "月", "period": 4, "time": "１４：４０～１６：１０", "subject": "ブライダル基礎", "teacher": "岡村 奈奈", "room": "ビューティールーム", "note": ""}, {"grade": 1, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "火", "period": 4, "time": "１４：４０～１６：１０", "subject": "セルフメイク", "teacher": "関本 利恵", "room": "ビューティールーム", "note": ""}, {"grade": 1, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "水", "period": 4, "time": "１４：４０～１６：１０", "subject": "パーソナルカラー", "teacher": "石垣 利恵", "room": "ビューティールーム", "note": "【不定期】"}, {"grade": 1, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "木", "period": 4, "time": "１４：４０～１６：１０", "subject": "キャリアプログラム", "teacher": "担任", "room": "402", "note": ""}, {"grade": 1, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "金", "period": 4, "time": "１４：４０～１６：１０", "subject": "ホスピタリティコミュニケーション", "teacher": "城 万紀子", "room": "403・4", "note": "全10回（合同）"}, {"grade": 1, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "月", "period": 5, "time": "１６：２０～１７：５０", "subject": "音響・音楽", "teacher": "岡村 奈奈", "room": "ビューティールーム", "note": ""}, {"grade": 1, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "木", "period": 5, "time": "１６：２０～１７：５０", "subject": "業界研究", "teacher": "岡村 奈奈", "room": "401", "note": ""}, {"grade": 1, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "火", "period": 1, "time": "９：００～１０：３０", "subject": "ブライダルの演出", "teacher": "武田 絢子", "room": "402", "note": ""}, {"grade": 1, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "水", "period": 1, "time": "９：００～１０：３０", "subject": "IT基礎知識", "teacher": "田村 勇樹", "room": "401", "note": "（エア観 合同）"}, {"grade": 1, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "月", "period": 2, "time": "１０：４０～１２：１０", "subject": "表現力コミュニケーション", "teacher": "井上 勝馬", "room": "ビューティールーム", "note": ""}, {"grade": 1, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "火", "period": 2, "time": "１０：４０～１２：１０", "subject": "フラワーコーディネート", "teacher": "星 麻美", "room": "ビューティールーム", "note": ""}, {"grade": 1, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "金", "period": 2, "time": "１０：４０～１２：１０", "subject": "服飾史", "teacher": "櫻井 まどか", "room": "401", "note": ""}, {"grade": 1, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "異文化理解", "teacher": "小池 美穂", "room": "402", "note": ""}, {"grade": 1, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "火", "period": 3, "time": "１３：0０～１４：３０", "subject": "セルフメイク", "teacher": "関本 利恵", "room": "ビューティールーム", "note": ""}, {"grade": 1, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "水", "period": 3, "time": "１３：0０～１４：３０", "subject": "Self Development", "teacher": "石垣 利恵", "room": "ビューティールーム", "note": "【不定期】"}, {"grade": 1, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "木", "period": 3, "time": "１３：0０～１４：３０", "subject": "ドレスメンテナンス", "teacher": "櫻井 まどか", "room": "ドレスルーム", "note": ""}, {"grade": 1, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "金", "period": 3, "time": "１３：0０～１４：３０", "subject": "ドレススタイリング", "teacher": "櫻井 まどか", "room": "ビューティールーム", "note": ""}, {"grade": 1, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "月", "period": 4, "time": "１４：４０～１６：１０", "subject": "ブライダル基礎", "teacher": "岡村 奈奈", "room": "ビューティールーム", "note": ""}, {"grade": 1, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "火", "period": 4, "time": "１４：４０～１６：１０", "subject": "セルフメイク", "teacher": "関本 利恵", "room": "ビューティールーム", "note": ""}, {"grade": 1, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "水", "period": 4, "time": "１４：４０～１６：１０", "subject": "パーソナルカラー", "teacher": "石垣 利恵", "room": "ビューティールーム", "note": "【不定期】"}, {"grade": 1, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "木", "period": 4, "time": "１４：４０～１６：１０", "subject": "キャリアプログラム", "teacher": "担任", "room": "402", "note": ""}, {"grade": 1, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "金", "period": 4, "time": "１４：４０～１６：１０", "subject": "ホスピタリティコミュニケーション", "teacher": "城 万紀子", "room": "403・4", "note": "全10回（合同）"}, {"grade": 1, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "月", "period": 5, "time": "１６：２０～１７：５０", "subject": "音響・音楽", "teacher": "岡村 奈奈", "room": "ビューティールーム", "note": ""}, {"grade": 1, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "木", "period": 5, "time": "１６：２０～１７：５０", "subject": "業界研究", "teacher": "岡村 奈奈", "room": "401", "note": ""}, {"grade": 1, "world": "エアラインワールド（3年制・4年制）", "day": "火", "period": 1, "time": "９：００～１０：３０", "subject": "セルフアップビューティー", "teacher": "関本 利恵", "room": "ビューティールーム", "note": ""}, {"grade": 1, "world": "エアラインワールド（3年制・4年制）", "day": "水", "period": 1, "time": "９：００～１０：３０", "subject": "IT基礎知識", "teacher": "田村 勇樹", "room": "401", "note": ""}, {"grade": 1, "world": "エアラインワールド（3年制・4年制）", "day": "木", "period": 1, "time": "９：００～１０：３０", "subject": "TOEIC", "teacher": "ILC", "room": "S：501", "note": "A：502 / B：503"}, {"grade": 1, "world": "エアラインワールド（3年制・4年制）", "day": "金", "period": 1, "time": "９：００～１０：３０", "subject": "JALキャリアプログラム", "teacher": "日本航空", "room": "エアラインルーム", "note": "【不定期授業】"}, {"grade": 1, "world": "エアラインワールド（3年制・4年制）", "day": "火", "period": 2, "time": "１０：４０～１２：１０", "subject": "英会話Ⅰ", "teacher": "A：304", "room": "B1：501 / B2：502", "note": "C1：503 / C2：504"}, {"grade": 1, "world": "エアラインワールド（3年制・4年制）", "day": "水", "period": 2, "time": "１０：４０～１２：１０", "subject": "英会話Ⅰ", "teacher": "A：304", "room": "B1：501 / B2：502", "note": "C1：503 / C2：504"}, {"grade": 1, "world": "エアラインワールド（3年制・4年制）", "day": "木", "period": 2, "time": "１０：４０～１２：１０", "subject": "チームビルディング", "teacher": "塩家 吹雪", "room": "601", "note": ""}, {"grade": 1, "world": "エアラインワールド（3年制・4年制）", "day": "金", "period": 2, "time": "１０：４０～１２：１０", "subject": "JALキャリアプログラム", "teacher": "日本航空", "room": "エアラインルーム", "note": "【不定期授業】"}, {"grade": 1, "world": "エアラインワールド（3年制・4年制）", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "キャリアプログラム", "teacher": "担任", "room": "601", "note": ""}, {"grade": 1, "world": "エアラインワールド（3年制・4年制）", "day": "火", "period": 3, "time": "１３：0０～１４：３０", "subject": "セルフマネジメントⅠ", "teacher": "内藤 法子", "room": "601", "note": ""}, {"grade": 1, "world": "エアラインワールド（3年制・4年制）", "day": "木", "period": 3, "time": "１３：0０～１４：３０", "subject": "英会話Ⅰ", "teacher": "A：304", "room": "B1：501 / B2：502", "note": "C1：503 / C2：504"}, {"grade": 1, "world": "エアラインワールド（3年制・4年制）", "day": "金", "period": 3, "time": "１３：0０～１４：３０", "subject": "英会話Ⅰ", "teacher": "A：304", "room": "B1：501 / B2：502", "note": "C1：503 / C2：504"}, {"grade": 1, "world": "エアラインワールド（3年制・4年制）", "day": "月", "period": 4, "time": "１４：４０～１６：１０", "subject": "TOEIC", "teacher": "ILC", "room": "S：501", "note": "A：502 / B：503"}, {"grade": 1, "world": "エアラインワールド（3年制・4年制）", "day": "火", "period": 4, "time": "１４：４０～１６：１０", "subject": "航空業界基礎知識", "teacher": "遠藤 孝博", "room": "エアラインルーム", "note": ""}, {"grade": 1, "world": "エアラインワールド（3年制・4年制）", "day": "木", "period": 4, "time": "１４：４０～１６：１０", "subject": "エアラインマナー", "teacher": "本田 名智", "room": "601", "note": ""}, {"grade": 1, "world": "エアラインワールド（3年制・4年制）", "day": "金", "period": 4, "time": "１４：４０～１６：１０", "subject": "ホスピタリティコミュニケーション", "teacher": "城 万紀子", "room": "403・4", "note": "10回"}, {"grade": 1, "world": "エアラインワールド（3年制・4年制）", "day": "火", "period": 5, "time": "１６：２０～１７：５０", "subject": "航空知識Ⅰ", "teacher": "平地 和恵", "room": "エアラインルーム", "note": ""}, {"grade": 1, "world": "観光ワールド（4年制）", "day": "月", "period": 1, "time": "９：００～１０：３０", "subject": "観光概論", "teacher": "長木 利通", "room": "501", "note": ""}, {"grade": 1, "world": "観光ワールド（4年制）", "day": "火", "period": 1, "time": "９：００～１０：３０", "subject": "観光イベントプランニング", "teacher": "神崎 公一", "room": "502", "note": ""}, {"grade": 1, "world": "観光ワールド（4年制）", "day": "水", "period": 1, "time": "９：００～１０：３０", "subject": "IT基礎知識", "teacher": "田村 勇樹", "room": "401", "note": ""}, {"grade": 1, "world": "観光ワールド（4年制）", "day": "木", "period": 1, "time": "９：００～１０：３０", "subject": "TOEIC", "teacher": "ILC", "room": "S：501", "note": "A：502 / B：503"}, {"grade": 1, "world": "観光ワールド（4年制）", "day": "月", "period": 2, "time": "１０：４０～１２：１０", "subject": "ツアー企画", "teacher": "黒田 尚嗣", "room": "502", "note": ""}, {"grade": 1, "world": "観光ワールド（4年制）", "day": "火", "period": 2, "time": "１０：４０～１２：１０", "subject": "英会話Ⅰ", "teacher": "A：304", "room": "B1：501 / B2：502", "note": "C1：503 / C2：504"}, {"grade": 1, "world": "観光ワールド（4年制）", "day": "水", "period": 2, "time": "１０：４０～１２：１０", "subject": "英会話Ⅰ", "teacher": "A：304", "room": "B1：501 / B2：502", "note": "C1：503 / C2：504"}, {"grade": 1, "world": "観光ワールド（4年制）", "day": "木", "period": 2, "time": "１０：４０～１２：１０", "subject": "チームビルディング", "teacher": "塩家 吹雪", "room": "601", "note": ""}, {"grade": 1, "world": "観光ワールド（4年制）", "day": "金", "period": 2, "time": "１０：４０～１２：１０", "subject": "観光概論基礎Ⅰ", "teacher": "弓野 克彦", "room": "303", "note": ""}, {"grade": 1, "world": "観光ワールド（4年制）", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "キャリアプログラム", "teacher": "担任", "room": "601", "note": ""}, {"grade": 1, "world": "観光ワールド（4年制）", "day": "火", "period": 3, "time": "１３：0０～１４：３０", "subject": "ONSENガストロノミーⅠ", "teacher": "溝田 祐一郎", "room": "502", "note": ""}, {"grade": 1, "world": "観光ワールド（4年制）", "day": "水", "period": 3, "time": "１３：0０～１４：３０", "subject": "地域コンシェルジュ", "teacher": "竹内 秀次郎", "room": "403・4", "note": "【6/17・9/9の2回実施】"}, {"grade": 1, "world": "観光ワールド（4年制）", "day": "木", "period": 3, "time": "１３：0０～１４：３０", "subject": "英会話Ⅰ", "teacher": "A：304", "room": "B1：501 / B2：502", "note": "C1：503 / C2：504"}, {"grade": 1, "world": "観光ワールド（4年制）", "day": "金", "period": 3, "time": "１３：0０～１４：３０", "subject": "英会話Ⅰ", "teacher": "A：304", "room": "B1：501 / B2：502", "note": "C1：503 / C2：504"}, {"grade": 1, "world": "観光ワールド（4年制）", "day": "月", "period": 4, "time": "１４：４０～１６：１０", "subject": "TOEIC", "teacher": "ILC", "room": "S：501", "note": "A：502 / B：503"}, {"grade": 1, "world": "観光ワールド（4年制）", "day": "金", "period": 4, "time": "１４：４０～１６：１０", "subject": "ホスピタリティコミュニケーション", "teacher": "城 万紀子", "room": "403・4", "note": "10回"}, {"grade": 2, "world": "ホテルワールド（3年制・4年制）", "day": "月", "period": 1, "time": "９：００～１０：３０", "subject": "表現力コミュニケーション", "teacher": "井上 勝馬", "room": "ビューティールーム", "note": ""}, {"grade": 2, "world": "ホテルワールド（3年制・4年制）", "day": "火", "period": 1, "time": "９：００～１０：３０", "subject": "英会話Ⅲ", "teacher": "ILC", "room": "A：501 / B：504", "note": ""}, {"grade": 2, "world": "ホテルワールド（3年制・4年制）", "day": "木", "period": 1, "time": "９：００～１０：３０", "subject": "TOEIC", "teacher": "ILC", "room": "S：501", "note": "A：502 / B：503"}, {"grade": 2, "world": "ホテルワールド（3年制・4年制）", "day": "金", "period": 1, "time": "９：００～１０：３０", "subject": "韓国語", "teacher": "ILC", "room": "403・4", "note": "【THL選択】"}, {"grade": 2, "world": "ホテルワールド（3年制・4年制）", "day": "月", "period": 2, "time": "１０：４０～１２：１０", "subject": "異文化交流", "teacher": "佐藤 玲子", "room": "403・4", "note": ""}, {"grade": 2, "world": "ホテルワールド（3年制・4年制）", "day": "火", "period": 2, "time": "１０：４０～１２：１０", "subject": "チームビルディング", "teacher": "中野 智", "room": "601", "note": ""}, {"grade": 2, "world": "ホテルワールド（3年制・4年制）", "day": "木", "period": 2, "time": "１０：４０～１２：１０", "subject": "英会話Ⅲ", "teacher": "ILC", "room": "A：501 / B：504", "note": ""}, {"grade": 2, "world": "ホテルワールド（3年制・4年制）", "day": "金", "period": 2, "time": "１０：４０～１２：１０", "subject": "英会話Ⅲ", "teacher": "ILC", "room": "A：501 / B：504", "note": ""}, {"grade": 2, "world": "ホテルワールド（3年制・4年制）", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "異文化交流", "teacher": "佐藤 玲子", "room": "403・4", "note": ""}, {"grade": 2, "world": "ホテルワールド（3年制・4年制）", "day": "火", "period": 3, "time": "１３：0０～１４：３０", "subject": "日本の伝統文化", "teacher": "佐藤 玲子", "room": "403・4", "note": ""}, {"grade": 2, "world": "ホテルワールド（3年制・4年制）", "day": "水", "period": 3, "time": "１３：0０～１４：３０", "subject": "英会話Ⅲ", "teacher": "ILC", "room": "A：501 / B：504", "note": ""}, {"grade": 2, "world": "ホテルワールド（3年制・4年制）", "day": "金", "period": 3, "time": "１３：0０～１４：３０", "subject": "キャリアプログラムⅡ", "teacher": "城 万紀子", "room": "402", "note": ""}, {"grade": 2, "world": "ホテルワールド（3年制・4年制）", "day": "月", "period": 4, "time": "１４：４０～１６：１０", "subject": "TOEIC", "teacher": "ILC", "room": "S：501", "note": "A：502 / B：503"}, {"grade": 2, "world": "ホテルワールド（3年制・4年制）", "day": "火", "period": 4, "time": "１４：４０～１６：１０", "subject": "セルフケア", "teacher": "曽根 美恵", "room": "401", "note": ""}, {"grade": 2, "world": "ホテルワールド（3年制・4年制）", "day": "水", "period": 4, "time": "１４：４０～１６：１０", "subject": "アルコールの基礎", "teacher": "富永 誠", "room": "403・4 / バンケットルーム", "note": "【THL選択】"}, {"grade": 2, "world": "ホテルワールド（3年制・4年制）", "day": "月", "period": 5, "time": "１６：２０～１７：５０", "subject": "ゲーミング", "teacher": "平岡 里実", "room": "ゲーミングルーム", "note": "【THL選択】"}, {"grade": 2, "world": "ホテルワールド（3年制・4年制）", "day": "火", "period": 5, "time": "１６：２０～１７：５０", "subject": "ヘアメイク＆スタイリング", "teacher": "関本 理恵", "room": "ビューティールーム", "note": "【THL選択】"}, {"grade": 2, "world": "ホテルワールド（3年制・4年制）", "day": "水", "period": 5, "time": "１６：２０～１７：５０", "subject": "カメラワーク", "teacher": "田村 勇樹", "room": "403・4", "note": "【THL選択】"}, {"grade": 2, "world": "ホテルワールド（3年制・4年制）", "day": "木", "period": 5, "time": "１６：２０～１７：５０", "subject": "ヨガ", "teacher": "山本 美穂", "room": "403・4", "note": "【THL選択】"}, {"grade": 2, "world": "ホテルワールド（3年制・4年制）", "day": "金", "period": 5, "time": "１６：２０～１７：５０", "subject": "韓国語", "teacher": "ILC", "room": "403・4", "note": "【THL選択】"}, {"grade": 2, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "月", "period": 1, "time": "９：００～１０：３０", "subject": "コーヒーの基礎知識", "teacher": "高見澤 肇", "room": "503 / カフェ", "note": "【THL選択】"}, {"grade": 2, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "火", "period": 1, "time": "９：００～１０：３０", "subject": "企業プロジェクト", "teacher": "田村 勇樹", "room": "401", "note": ""}, {"grade": 2, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "木", "period": 1, "time": "９：００～１０：３０", "subject": "キャリアデザイン", "teacher": "矢島 慶佑", "room": "ビューティールーム", "note": ""}, {"grade": 2, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "金", "period": 1, "time": "９：００～１０：３０", "subject": "韓国語", "teacher": "ILC", "room": "403・4", "note": "【THL選択】"}, {"grade": 2, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "月", "period": 2, "time": "１０：４０～１２：１０", "subject": "キャリアプログラム", "teacher": "担任", "room": "402", "note": ""}, {"grade": 2, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "火", "period": 2, "time": "１０：４０～１２：１０", "subject": "カメラワーク", "teacher": "武田 絢子", "room": "402", "note": ""}, {"grade": 2, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "水", "period": 2, "time": "１０：４０～１２：１０", "subject": "BIA対策講座（3級）", "teacher": "渡邊 昌恵", "room": "ビューティールーム", "note": ""}, {"grade": 2, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "木", "period": 2, "time": "１０：４０～１２：１０", "subject": "イベント企画Ⅱ", "teacher": "岡村 奈奈", "room": "バンケットルーム/401", "note": ""}, {"grade": 2, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "金", "period": 2, "time": "１０：４０～１２：１０", "subject": "SPI対策", "teacher": "岡野 朋一", "room": "403・4", "note": "【選択】"}, {"grade": 2, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "表現力コミュニケーション", "teacher": "井上 勝馬", "room": "ビューティールーム", "note": ""}, {"grade": 2, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "火", "period": 3, "time": "１３：0０～１４：３０", "subject": "テーブルコーディネート", "teacher": "早坂 英里", "room": "バンケットルーム", "note": ""}, {"grade": 2, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "水", "period": 3, "time": "１３：0０～１４：３０", "subject": "ブライダルビジネスⅠ", "teacher": "北村 広一", "room": "402", "note": "【隔週】"}, {"grade": 2, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "木", "period": 3, "time": "１３：0０～１４：３０", "subject": "イベント企画Ⅱ", "teacher": "岡村 奈奈", "room": "401", "note": ""}, {"grade": 2, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "金", "period": 3, "time": "１３：0０～１４：３０", "subject": "SPI対策", "teacher": "岡野 朋一", "room": "403・4", "note": "【選択】"}, {"grade": 2, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "月", "period": 4, "time": "１４：４０～１６：１０", "subject": "滋慶選択", "teacher": "", "room": "", "note": "【選択】"}, {"grade": 2, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "火", "period": 4, "time": "１４：４０～１６：１０", "subject": "テーブルコーディネート", "teacher": "早坂 英里", "room": "バンケットルーム", "note": ""}, {"grade": 2, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "水", "period": 4, "time": "１４：４０～１６：１０", "subject": "ブライダルビジネスⅠ／映像編集", "teacher": "北村 広一／上山翔太郎", "room": "402/401", "note": "【隔週】"}, {"grade": 2, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "木", "period": 4, "time": "１４：４０～１６：１０", "subject": "ブライダルプランニングⅡ", "teacher": "岡村 奈奈", "room": "バンケットルーム/401", "note": ""}, {"grade": 2, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "月", "period": 5, "time": "１６：２０～１７：５０", "subject": "ゲーミング", "teacher": "平岡 里実", "room": "ゲーミングルーム", "note": "【THL選択】"}, {"grade": 2, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "火", "period": 5, "time": "１６：２０～１７：５０", "subject": "ヘアメイク＆スタイリング", "teacher": "関本 理恵", "room": "ビューティールーム", "note": "【THL選択】"}, {"grade": 2, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "水", "period": 5, "time": "１６：２０～１７：５０", "subject": "映像編集", "teacher": "上山 翔太郎", "room": "401", "note": "【隔週】"}, {"grade": 2, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "木", "period": 5, "time": "１６：２０～１７：５０", "subject": "就活対策講座", "teacher": "服部 陵子", "room": "ビューティールーム", "note": ""}, {"grade": 2, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "金", "period": 5, "time": "１６：２０～１７：５０", "subject": "韓国語", "teacher": "ILC", "room": "403・4", "note": "【THL選択】"}, {"grade": 2, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "月", "period": 1, "time": "９：００～１０：３０", "subject": "コーヒーの基礎知識", "teacher": "高見澤 肇", "room": "503 / カフェ", "note": "【THL選択】"}, {"grade": 2, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "火", "period": 1, "time": "９：００～１０：３０", "subject": "企業プロジェクト", "teacher": "田村 勇樹", "room": "401", "note": ""}, {"grade": 2, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "木", "period": 1, "time": "９：００～１０：３０", "subject": "キャリアデザイン", "teacher": "矢島 慶佑", "room": "ビューティールーム", "note": ""}, {"grade": 2, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "金", "period": 1, "time": "９：００～１０：３０", "subject": "韓国語", "teacher": "ILC", "room": "403・4", "note": "【THL選択】"}, {"grade": 2, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "月", "period": 2, "time": "１０：４０～１２：１０", "subject": "キャリアプログラム", "teacher": "担任", "room": "402", "note": ""}, {"grade": 2, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "火", "period": 2, "time": "１０：４０～１２：１０", "subject": "カメラワーク", "teacher": "武田 絢子", "room": "402", "note": ""}, {"grade": 2, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "水", "period": 2, "time": "１０：４０～１２：１０", "subject": "BIA対策講座（3級）", "teacher": "渡邊 昌恵", "room": "ビューティールーム", "note": ""}, {"grade": 2, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "木", "period": 2, "time": "１０：４０～１２：１０", "subject": "イベント企画Ⅱ", "teacher": "岡村 奈奈", "room": "バンケットルーム/401", "note": ""}, {"grade": 2, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "金", "period": 2, "time": "１０：４０～１２：１０", "subject": "SPI対策", "teacher": "岡野 朋一", "room": "403・4", "note": "【選択】"}, {"grade": 2, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "表現力コミュニケーション", "teacher": "井上 勝馬", "room": "ビューティールーム", "note": ""}, {"grade": 2, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "火", "period": 3, "time": "１３：0０～１４：３０", "subject": "和装着付け実習", "teacher": "下辻 久子", "room": "ゲストルーム", "note": ""}, {"grade": 2, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "水", "period": 3, "time": "１３：0０～１４：３０", "subject": "ブライダルビジネスⅠ", "teacher": "北村 広一", "room": "402", "note": "【隔週】"}, {"grade": 2, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "木", "period": 3, "time": "１３：0０～１４：３０", "subject": "イベント企画Ⅱ", "teacher": "岡村 奈奈", "room": "401", "note": ""}, {"grade": 2, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "金", "period": 3, "time": "１３：0０～１４：３０", "subject": "SPI対策", "teacher": "岡野 朋一", "room": "403・4", "note": "【選択】"}, {"grade": 2, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "月", "period": 4, "time": "１４：４０～１６：１０", "subject": "滋慶選択", "teacher": "", "room": "", "note": "【選択】"}, {"grade": 2, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "火", "period": 4, "time": "１４：４０～１６：１０", "subject": "和装着付け実習", "teacher": "下辻 久子", "room": "ゲストルーム", "note": ""}, {"grade": 2, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "水", "period": 4, "time": "１４：４０～１６：１０", "subject": "ブライダルビジネスⅠ／映像編集", "teacher": "北村 広一／上山翔太郎", "room": "402/401", "note": "【隔週】"}, {"grade": 2, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "木", "period": 4, "time": "１４：４０～１６：１０", "subject": "ブライダルプランニングⅡ", "teacher": "岡村 奈奈", "room": "バンケットルーム/401", "note": ""}, {"grade": 2, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "金", "period": 4, "time": "１４：４０～１６：１０", "subject": "店舗接客Ⅱ", "teacher": "櫻井 まどか", "room": "ドレスルーム", "note": ""}, {"grade": 2, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "月", "period": 5, "time": "１６：２０～１７：５０", "subject": "ゲーミング", "teacher": "平岡 里実", "room": "ゲーミングルーム", "note": "【THL選択】"}, {"grade": 2, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "火", "period": 5, "time": "１６：２０～１７：５０", "subject": "ヘアメイク＆スタイリング", "teacher": "関本 理恵", "room": "ビューティールーム", "note": "【THL選択】"}, {"grade": 2, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "水", "period": 5, "time": "１６：２０～１７：５０", "subject": "映像編集", "teacher": "上山 翔太郎", "room": "401", "note": "【隔週】"}, {"grade": 2, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "木", "period": 5, "time": "１６：２０～１７：５０", "subject": "就活対策講座", "teacher": "服部 陵子", "room": "ビューティールーム", "note": ""}, {"grade": 2, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "金", "period": 5, "time": "１６：２０～１７：５０", "subject": "店舗接客Ⅱ", "teacher": "櫻井 まどか", "room": "ドレスルーム", "note": ""}, {"grade": 2, "world": "エアラインワールド（3年制・4年制）", "day": "月", "period": 1, "time": "９：００～１０：３０", "subject": "コーヒーの基礎知識", "teacher": "高見澤 肇", "room": "503 / カフェ", "note": "【THL選択】"}, {"grade": 2, "world": "エアラインワールド（3年制・4年制）", "day": "火", "period": 1, "time": "９：００～１０：３０", "subject": "英会話Ⅲ", "teacher": "ILC", "room": "A：501 / B：504", "note": ""}, {"grade": 2, "world": "エアラインワールド（3年制・4年制）", "day": "木", "period": 1, "time": "９：００～１０：３０", "subject": "TOEIC", "teacher": "ILC", "room": "S：501 / A：502", "note": "B:503"}, {"grade": 2, "world": "エアラインワールド（3年制・4年制）", "day": "金", "period": 1, "time": "９：００～１０：３０", "subject": "韓国語", "teacher": "ILC", "room": "403・4", "note": "【THL選択】"}, {"grade": 2, "world": "エアラインワールド（3年制・4年制）", "day": "月", "period": 2, "time": "１０：４０～１２：１０", "subject": "異文化交流", "teacher": "佐藤 玲子", "room": "403・4", "note": ""}, {"grade": 2, "world": "エアラインワールド（3年制・4年制）", "day": "水", "period": 2, "time": "１０：４０～１２：１０", "subject": "接客シミュレーション", "teacher": "内藤 法子", "room": "エアラインルーム", "note": ""}, {"grade": 2, "world": "エアラインワールド（3年制・4年制）", "day": "木", "period": 2, "time": "１０：４０～１２：１０", "subject": "英会話Ⅲ", "teacher": "ILC", "room": "A：501 / B：504", "note": ""}, {"grade": 2, "world": "エアラインワールド（3年制・4年制）", "day": "金", "period": 2, "time": "１０：４０～１２：１０", "subject": "英会話Ⅲ", "teacher": "ILC", "room": "A：501 / B：504", "note": ""}, {"grade": 2, "world": "エアラインワールド（3年制・4年制）", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "異文化交流", "teacher": "佐藤 玲子", "room": "403・4", "note": ""}, {"grade": 2, "world": "エアラインワールド（3年制・4年制）", "day": "火", "period": 3, "time": "１３：0０～１４：３０", "subject": "日本の伝統文化", "teacher": "佐藤 玲子", "room": "403・4", "note": ""}, {"grade": 2, "world": "エアラインワールド（3年制・4年制）", "day": "水", "period": 3, "time": "１３：0０～１４：３０", "subject": "英会話Ⅲ", "teacher": "ILC", "room": "A：501 / B：504", "note": ""}, {"grade": 2, "world": "エアラインワールド（3年制・4年制）", "day": "月", "period": 4, "time": "１４：４０～１６：１０", "subject": "TOEIC", "teacher": "ILC", "room": "S：501", "note": "A：502 / B：503"}, {"grade": 2, "world": "エアラインワールド（3年制・4年制）", "day": "火", "period": 4, "time": "１４：４０～１６：１０", "subject": "航空知識Ⅱ", "teacher": "平地 和恵", "room": "601", "note": ""}, {"grade": 2, "world": "エアラインワールド（3年制・4年制）", "day": "水", "period": 4, "time": "１４：４０～１６：１０", "subject": "【GSのみ】就職対策基礎", "teacher": "内藤 法子", "room": "601", "note": ""}, {"grade": 2, "world": "エアラインワールド（3年制・4年制）", "day": "月", "period": 5, "time": "１６：２０～１７：５０", "subject": "ゲーミング", "teacher": "平岡 里実", "room": "ゲーミングルーム", "note": "【THL選択】"}, {"grade": 2, "world": "エアラインワールド（3年制・4年制）", "day": "火", "period": 5, "time": "１６：２０～１７：５０", "subject": "ヘアメイク＆スタイリング", "teacher": "関本 理恵", "room": "ビューティールーム", "note": "【THL選択】"}, {"grade": 2, "world": "エアラインワールド（3年制・4年制）", "day": "水", "period": 5, "time": "１６：２０～１７：５０", "subject": "業界研究", "teacher": "岡本 真理", "room": "501", "note": ""}, {"grade": 2, "world": "エアラインワールド（3年制・4年制）", "day": "木", "period": 5, "time": "１６：２０～１７：５０", "subject": "ヨガ", "teacher": "山本 美穂", "room": "403・4", "note": "【THL選択】"}, {"grade": 2, "world": "エアラインワールド（3年制・4年制）", "day": "金", "period": 5, "time": "１６：２０～１７：５０", "subject": "韓国語", "teacher": "ILC", "room": "403・4", "note": "【THL選択】"}, {"grade": 2, "world": "観光ワールド（4年制）", "day": "月", "period": 1, "time": "９：００～１０：３０", "subject": "観光資源Ⅰ", "teacher": "黒田 尚嗣", "room": "502", "note": ""}, {"grade": 2, "world": "観光ワールド（4年制）", "day": "火", "period": 1, "time": "９：００～１０：３０", "subject": "英会話Ⅲ", "teacher": "ILC", "room": "A：501 / B：504", "note": ""}, {"grade": 2, "world": "観光ワールド（4年制）", "day": "木", "period": 1, "time": "９：００～１０：３０", "subject": "TOEIC", "teacher": "ILC", "room": "S：501", "note": "A：502 / B：503"}, {"grade": 2, "world": "観光ワールド（4年制）", "day": "金", "period": 1, "time": "９：００～１０：３０", "subject": "韓国語", "teacher": "ILC", "room": "403・4", "note": "【THL選択】"}, {"grade": 2, "world": "観光ワールド（4年制）", "day": "月", "period": 2, "time": "１０：４０～１２：１０", "subject": "異文化交流", "teacher": "佐藤 玲子", "room": "403・4", "note": ""}, {"grade": 2, "world": "観光ワールド（4年制）", "day": "火", "period": 2, "time": "１０：４０～１２：１０", "subject": "ONSENガストロノミーⅡ", "teacher": "溝田 祐一郎", "room": "302", "note": ""}, {"grade": 2, "world": "観光ワールド（4年制）", "day": "水", "period": 2, "time": "１０：４０～１２：１０", "subject": "イベント企画", "teacher": "青木 思生", "room": "601", "note": ""}, {"grade": 2, "world": "観光ワールド（4年制）", "day": "木", "period": 2, "time": "１０：４０～１２：１０", "subject": "英会話Ⅲ", "teacher": "ILC", "room": "A：501 / B：504", "note": ""}, {"grade": 2, "world": "観光ワールド（4年制）", "day": "金", "period": 2, "time": "１０：４０～１２：１０", "subject": "英会話Ⅲ", "teacher": "ILC", "room": "A：501 / B：504", "note": ""}, {"grade": 2, "world": "観光ワールド（4年制）", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "異文化交流", "teacher": "佐藤 玲子", "room": "403・4", "note": ""}, {"grade": 2, "world": "観光ワールド（4年制）", "day": "火", "period": 3, "time": "１３：0０～１４：３０", "subject": "日本の伝統文化", "teacher": "佐藤 玲子", "room": "403・4", "note": ""}, {"grade": 2, "world": "観光ワールド（4年制）", "day": "水", "period": 3, "time": "１３：0０～１４：３０", "subject": "英会話Ⅲ", "teacher": "ILC", "room": "A：501 / B：504", "note": ""}, {"grade": 2, "world": "観光ワールド（4年制）", "day": "金", "period": 3, "time": "１３：0０～１４：３０", "subject": "インバウンドビジネス論", "teacher": "弓野 克彦", "room": "303", "note": ""}, {"grade": 2, "world": "観光ワールド（4年制）", "day": "月", "period": 4, "time": "１４：４０～１６：１０", "subject": "TOEIC", "teacher": "ILC", "room": "S：501", "note": "A：502 / B：503"}, {"grade": 2, "world": "観光ワールド（4年制）", "day": "火", "period": 4, "time": "１４：４０～１６：１０", "subject": "旅行業実践学", "teacher": "名鉄観光", "room": "501", "note": ""}, {"grade": 2, "world": "観光ワールド（4年制）", "day": "水", "period": 4, "time": "１４：４０～１６：１０", "subject": "アルコールの基礎", "teacher": "富永 誠", "room": "バンケットルーム", "note": "【THL選択】"}, {"grade": 2, "world": "観光ワールド（4年制）", "day": "月", "period": 5, "time": "１６：２０～１７：５０", "subject": "ゲーミング", "teacher": "平岡 里実", "room": "ゲーミングルーム", "note": "【THL選択】"}, {"grade": 2, "world": "観光ワールド（4年制）", "day": "火", "period": 5, "time": "１６：２０～１７：５０", "subject": "旅行業実践学", "teacher": "名鉄観光", "room": "501", "note": "【不定期授業】"}, {"grade": 2, "world": "観光ワールド（4年制）", "day": "水", "period": 5, "time": "１６：２０～１７：５０", "subject": "カメラワーク", "teacher": "田村 勇樹", "room": "403・4", "note": "【THL選択】"}, {"grade": 2, "world": "観光ワールド（4年制）", "day": "木", "period": 5, "time": "１６：２０～１７：５０", "subject": "ヨガ", "teacher": "山本 美穂", "room": "403・4", "note": "【THL選択】"}, {"grade": 2, "world": "観光ワールド（4年制）", "day": "金", "period": 5, "time": "１６：２０～１７：５０", "subject": "韓国語", "teacher": "ILC", "room": "403・4", "note": "【THL選択】"}, {"grade": 3, "world": "ホテルワールド（3年制・4年制）", "day": "月", "period": 1, "time": "９：００～１０：３０", "subject": "コーヒーの基礎知識", "teacher": "高見澤 肇", "room": "503 / カフェ", "note": "【THL選択】"}, {"grade": 3, "world": "ホテルワールド（3年制・4年制）", "day": "火", "period": 1, "time": "９：００～１０：３０", "subject": "企業プロジェクト", "teacher": "亀山 和也", "room": "403・4", "note": ""}, {"grade": 3, "world": "ホテルワールド（3年制・4年制）", "day": "水", "period": 1, "time": "９：００～１０：３０", "subject": "ビジネス英会話Ⅱ", "teacher": "ILC", "room": "A：501", "note": "B：502 / C：503"}, {"grade": 3, "world": "ホテルワールド（3年制・4年制）", "day": "金", "period": 1, "time": "９：００～１０：３０", "subject": "ビジネス英会話Ⅱ", "teacher": "ILC", "room": "A：501", "note": "B：502 / C：503"}, {"grade": 3, "world": "ホテルワールド（3年制・4年制）", "day": "月", "period": 2, "time": "１０：４０～１２：１０", "subject": "バー・ラウンジサービス", "teacher": "栗原 幸代", "room": "1Fカフェ", "note": ""}, {"grade": 3, "world": "ホテルワールド（3年制・4年制）", "day": "火", "period": 2, "time": "１０：４０～１２：１０", "subject": "企業プロジェクト", "teacher": "亀山 和也", "room": "403・4", "note": ""}, {"grade": 3, "world": "ホテルワールド（3年制・4年制）", "day": "水", "period": 2, "time": "１０：４０～１２：１０", "subject": "手話", "teacher": "髙島 良宏", "room": "403・4", "note": ""}, {"grade": 3, "world": "ホテルワールド（3年制・4年制）", "day": "木", "period": 2, "time": "１０：４０～１２：１０", "subject": "コンシェルジュゼミ", "teacher": "田隝 益美", "room": "403・4", "note": ""}, {"grade": 3, "world": "ホテルワールド（3年制・4年制）", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "ビジネス英会話Ⅱ", "teacher": "ILC", "room": "A：501", "note": "B：502 / C：503"}, {"grade": 3, "world": "ホテルワールド（3年制・4年制）", "day": "火", "period": 3, "time": "１３：0０～１４：３０", "subject": "ホテル開発演習", "teacher": "小倉 一夫", "room": "303", "note": "ホテル開発"}, {"grade": 3, "world": "ホテルワールド（3年制・4年制）", "day": "水", "period": 3, "time": "１３：0０～１４：３０", "subject": "アルコールの知識", "teacher": "富永 誠", "room": "バンケットルーム", "note": ""}, {"grade": 3, "world": "ホテルワールド（3年制・4年制）", "day": "木", "period": 3, "time": "１３：0０～１４：３０", "subject": "コンシェルジュゼミ", "teacher": "田隝 益美", "room": "403・4", "note": ""}, {"grade": 3, "world": "ホテルワールド（3年制・4年制）", "day": "金", "period": 3, "time": "１３：0０～１４：３０", "subject": "レストランゼミ", "teacher": "宮崎 辰", "room": "バンケットルーム", "note": ""}, {"grade": 3, "world": "ホテルワールド（3年制・4年制）", "day": "月", "period": 4, "time": "１４：４０～１６：１０", "subject": "マネジメントゼミ", "teacher": "小倉 一夫", "room": "303", "note": "統計・分析"}, {"grade": 3, "world": "ホテルワールド（3年制・4年制）", "day": "火", "period": 4, "time": "１４：４０～１６：１０", "subject": "ホテル開発演習", "teacher": "小倉 一夫", "room": "303", "note": "ホテル開発"}, {"grade": 3, "world": "ホテルワールド（3年制・4年制）", "day": "水", "period": 4, "time": "１４：４０～１６：１０", "subject": "アルコールの基礎", "teacher": "富永 誠", "room": "403・4 / バンケットルーム", "note": "【THL選択】"}, {"grade": 3, "world": "ホテルワールド（3年制・4年制）", "day": "木", "period": 4, "time": "１４：４０～１６：１０", "subject": "ビジネス英会話Ⅱ", "teacher": "ILC", "room": "A：501", "note": "B：502 / C：503"}, {"grade": 3, "world": "ホテルワールド（3年制・4年制）", "day": "金", "period": 4, "time": "１４：４０～１６：１０", "subject": "レストランゼミ", "teacher": "宮崎 辰", "room": "バンケットルーム", "note": ""}, {"grade": 3, "world": "ホテルワールド（3年制・4年制）", "day": "月", "period": 5, "time": "１６：２０～１７：５０", "subject": "マネジメントゼミ", "teacher": "小倉 一夫", "room": "303", "note": "統計・分析"}, {"grade": 3, "world": "ホテルワールド（3年制・4年制）", "day": "火", "period": 5, "time": "１６：２０～１７：５０", "subject": "ヘアメイク＆スタイリング", "teacher": "関本 理恵", "room": "ビューティールーム", "note": "【THL選択】"}, {"grade": 3, "world": "ホテルワールド（3年制・4年制）", "day": "水", "period": 5, "time": "１６：２０～１７：５０", "subject": "カメラワーク", "teacher": "田村 勇樹", "room": "403・4", "note": "【THL選択】"}, {"grade": 3, "world": "ホテルワールド（3年制・4年制）", "day": "木", "period": 5, "time": "１６：２０～１７：５０", "subject": "ヨガ", "teacher": "山本 美穂", "room": "403・4", "note": "【THL選択】"}, {"grade": 3, "world": "ホテルワールド（3年制・4年制）", "day": "金", "period": 5, "time": "１６：２０～１７：５０", "subject": "韓国語", "teacher": "ILC", "room": "403・4", "note": "【THL選択】"}, {"grade": 3, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "月", "period": 1, "time": "９：００～１０：３０", "subject": "コーヒーの基礎知識", "teacher": "高見澤 肇", "room": "503 / カフェ", "note": "【THL選択】"}, {"grade": 3, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "水", "period": 1, "time": "９：００～１０：３０", "subject": "BIA対策講座（2級）", "teacher": "渡邊 昌恵", "room": "ビューティールーム", "note": "【選択】"}, {"grade": 3, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "木", "period": 1, "time": "９：００～１０：３０", "subject": "デジタルマーケティング", "teacher": "津本 さおり", "room": "401", "note": ""}, {"grade": 3, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "金", "period": 1, "time": "９：００～１０：３０", "subject": "韓国語", "teacher": "ILC", "room": "403・4", "note": "【THL選択】"}, {"grade": 3, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "月", "period": 2, "time": "１０：４０～１２：１０", "subject": "業界研究Ⅲ", "teacher": "岡村 奈奈", "room": "401", "note": ""}, {"grade": 3, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "火", "period": 2, "time": "１０：４０～１２：１０", "subject": "セルフケア", "teacher": "曽根 美恵", "room": "401", "note": ""}, {"grade": 3, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "水", "period": 2, "time": "１０：４０～１２：１０", "subject": "AIリテラシー", "teacher": "田村 勇樹", "room": "401", "note": ""}, {"grade": 3, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "木", "period": 2, "time": "１０：４０～１２：１０", "subject": "ブライダルビジョン", "teacher": "渡辺 亜希子", "room": "402", "note": ""}, {"grade": 3, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "業界研究Ⅲ", "teacher": "岡村 奈奈", "room": "401", "note": ""}, {"grade": 3, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "火", "period": 3, "time": "１３：0０～１４：３０", "subject": "会計学", "teacher": "武田 絢子", "room": "402", "note": ""}, {"grade": 3, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "水", "period": 3, "time": "１３：0０～１４：３０", "subject": "WEBデザイン", "teacher": "上山 翔太郎", "room": "401", "note": ""}, {"grade": 3, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "月", "period": 4, "time": "１４：４０～１６：１０", "subject": "ブライダルフェア", "teacher": "小池 美穂", "room": "401", "note": ""}, {"grade": 3, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "火", "period": 4, "time": "１４：４０～１６：１０", "subject": "異文化理解", "teacher": "小池 美穂", "room": "402", "note": ""}, {"grade": 3, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "水", "period": 4, "time": "１４：４０～１６：１０", "subject": "アルコールの基礎", "teacher": "富永 誠", "room": "403・4 / バンケットルーム", "note": "【THL選択】"}, {"grade": 3, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "月", "period": 5, "time": "１６：２０～１７：５０", "subject": "ブライダルフェア", "teacher": "小池 美穂", "room": "401", "note": ""}, {"grade": 3, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "火", "period": 5, "time": "１６：２０～１７：５０", "subject": "ヘアメイク＆スタイリング", "teacher": "関本 理恵", "room": "ビューティールーム", "note": "【THL選択】"}, {"grade": 3, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "水", "period": 5, "time": "１６：２０～１７：５０", "subject": "カメラワーク", "teacher": "田村 勇樹", "room": "403・4", "note": "【THL選択】"}, {"grade": 3, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "木", "period": 5, "time": "１６：２０～１７：５０", "subject": "ヨガ", "teacher": "山本 美穂", "room": "403・4", "note": "【THL選択】"}, {"grade": 3, "world": "ブライダルワールド【プランナーコース】（3年制）", "day": "金", "period": 5, "time": "１６：２０～１７：５０", "subject": "韓国語", "teacher": "ILC", "room": "403・4", "note": "【THL選択】"}, {"grade": 3, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "月", "period": 1, "time": "９：００～１０：３０", "subject": "コーヒーの基礎知識", "teacher": "高見澤 肇", "room": "503 / カフェ", "note": "【THL選択】"}, {"grade": 3, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "水", "period": 1, "time": "９：００～１０：３０", "subject": "BIA対策講座（2級）", "teacher": "渡邊 昌恵", "room": "ビューティールーム", "note": "【選択】"}, {"grade": 3, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "木", "period": 1, "time": "９：００～１０：３０", "subject": "デジタルマーケティング", "teacher": "津本 さおり", "room": "401", "note": ""}, {"grade": 3, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "金", "period": 1, "time": "９：００～１０：３０", "subject": "韓国語", "teacher": "ILC", "room": "403・4", "note": "【THL選択】"}, {"grade": 3, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "月", "period": 2, "time": "１０：４０～１２：１０", "subject": "業界研究Ⅲ", "teacher": "岡村 奈奈", "room": "401", "note": ""}, {"grade": 3, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "火", "period": 2, "time": "１０：４０～１２：１０", "subject": "セルフケア", "teacher": "曽根 美恵", "room": "401", "note": ""}, {"grade": 3, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "水", "period": 2, "time": "１０：４０～１２：１０", "subject": "AIリテラシー", "teacher": "田村 勇樹", "room": "401", "note": ""}, {"grade": 3, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "木", "period": 2, "time": "１０：４０～１２：１０", "subject": "ブライダルビジョン", "teacher": "渡辺 亜希子", "room": "402", "note": ""}, {"grade": 3, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "業界研究Ⅲ", "teacher": "岡村 奈奈", "room": "401", "note": ""}, {"grade": 3, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "火", "period": 3, "time": "１３：0０～１４：３０", "subject": "会計学", "teacher": "武田 絢子", "room": "402", "note": ""}, {"grade": 3, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "水", "period": 3, "time": "１３：0０～１４：３０", "subject": "WEBデザイン", "teacher": "上山 翔太郎", "room": "401", "note": ""}, {"grade": 3, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "月", "period": 4, "time": "１４：４０～１６：１０", "subject": "ブライダルフェア", "teacher": "小池 美穂", "room": "401", "note": ""}, {"grade": 3, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "火", "period": 4, "time": "１４：４０～１６：１０", "subject": "異文化理解", "teacher": "小池 美穂", "room": "402", "note": ""}, {"grade": 3, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "水", "period": 4, "time": "１４：４０～１６：１０", "subject": "アルコールの基礎", "teacher": "富永 誠", "room": "403・4 / バンケットルーム", "note": "【THL選択】"}, {"grade": 3, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "木", "period": 4, "time": "１４：４０～１６：１０", "subject": "店舗接客Ⅲ", "teacher": "櫻井 まどか", "room": "ドレスルーム", "note": ""}, {"grade": 3, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "月", "period": 5, "time": "１６：２０～１７：５０", "subject": "ブライダルフェア", "teacher": "小池 美穂", "room": "401", "note": ""}, {"grade": 3, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "火", "period": 5, "time": "１６：２０～１７：５０", "subject": "ヘアメイク＆スタイリング", "teacher": "関本 理恵", "room": "ビューティールーム", "note": "【THL選択】"}, {"grade": 3, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "水", "period": 5, "time": "１６：２０～１７：５０", "subject": "カメラワーク", "teacher": "田村 勇樹", "room": "403・4", "note": "【THL選択】"}, {"grade": 3, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "木", "period": 5, "time": "１６：２０～１７：５０", "subject": "店舗接客Ⅲ", "teacher": "櫻井 まどか", "room": "ドレスルーム", "note": ""}, {"grade": 3, "world": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "day": "金", "period": 5, "time": "１６：２０～１７：５０", "subject": "韓国語", "teacher": "ILC", "room": "403・4", "note": "【THL選択】"}, {"grade": 3, "world": "エアラインワールド（4年制）", "day": "月", "period": 1, "time": "９：００～１０：３０", "subject": "コーヒーの基礎知識", "teacher": "高見澤 肇", "room": "503 / カフェ", "note": "【THL選択】"}, {"grade": 3, "world": "エアラインワールド（4年制）", "day": "水", "period": 1, "time": "９：００～１０：３０", "subject": "ビジネス英会話Ⅱ", "teacher": "ILC", "room": "A：501", "note": "B：502 / C：503"}, {"grade": 3, "world": "エアラインワールド（4年制）", "day": "木", "period": 1, "time": "９：００～１０：３０", "subject": "TOEIC", "teacher": "ILC", "room": "S：501", "note": "A：502 / B：503"}, {"grade": 3, "world": "エアラインワールド（4年制）", "day": "金", "period": 1, "time": "９：００～１０：３０", "subject": "ビジネス英会話Ⅱ", "teacher": "ILC", "room": "A：501", "note": "B：502 / C：503"}, {"grade": 3, "world": "エアラインワールド（4年制）", "day": "火", "period": 2, "time": "１０：４０～１２：１０", "subject": "就職対策Ⅰ", "teacher": "内藤 法子", "room": "エアラインルーム", "note": ""}, {"grade": 3, "world": "エアラインワールド（4年制）", "day": "金", "period": 2, "time": "１０：４０～１２：１０", "subject": "SPI対策", "teacher": "岡野 朋一", "room": "403・4", "note": ""}, {"grade": 3, "world": "エアラインワールド（4年制）", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "ビジネス英会話Ⅱ", "teacher": "ILC", "room": "A：501", "note": "B：502 / C：503"}, {"grade": 3, "world": "エアラインワールド（4年制）", "day": "火", "period": 3, "time": "１３：0０～１４：３０", "subject": "航空知識Ⅲ", "teacher": "平地 和恵", "room": "エアラインルーム", "note": ""}, {"grade": 3, "world": "エアラインワールド（4年制）", "day": "水", "period": 3, "time": "１３：0０～１４：３０", "subject": "就職対策Ⅱ", "teacher": "内藤 法子", "room": "601", "note": ""}, {"grade": 3, "world": "エアラインワールド（4年制）", "day": "木", "period": 3, "time": "１３：0０～１４：３０", "subject": "時事研究", "teacher": "本田 名智", "room": "601", "note": ""}, {"grade": 3, "world": "エアラインワールド（4年制）", "day": "金", "period": 3, "time": "１３：0０～１４：３０", "subject": "SPI対策", "teacher": "岡野 朋一", "room": "403・4", "note": ""}, {"grade": 3, "world": "エアラインワールド（4年制）", "day": "月", "period": 4, "time": "１４：４０～１６：１０", "subject": "TOEIC", "teacher": "ILC", "room": "S：501", "note": "A：502 / B：503"}, {"grade": 3, "world": "エアラインワールド（4年制）", "day": "火", "period": 4, "time": "１４：４０～１６：１０", "subject": "世界遺産観光概論", "teacher": "佐藤 玲子", "room": "504", "note": ""}, {"grade": 3, "world": "エアラインワールド（4年制）", "day": "水", "period": 4, "time": "１４：４０～１６：１０", "subject": "アルコールの基礎", "teacher": "富永 誠", "room": "403・4 / バンケットルーム", "note": "【THL選択】"}, {"grade": 3, "world": "エアラインワールド（4年制）", "day": "木", "period": 4, "time": "１４：４０～１６：１０", "subject": "ビジネス英会話Ⅱ", "teacher": "ILC", "room": "A：501", "note": "B：502 / C：503"}, {"grade": 3, "world": "エアラインワールド（4年制）", "day": "月", "period": 5, "time": "１６：２０～１７：５０", "subject": "ゲーミング", "teacher": "平岡 里実", "room": "ゲーミングルーム", "note": "【THL選択】"}, {"grade": 3, "world": "エアラインワールド（4年制）", "day": "火", "period": 5, "time": "１６：２０～１７：５０", "subject": "ヘアメイク＆スタイリング", "teacher": "関本 理恵", "room": "ビューティールーム", "note": "【THL選択】"}, {"grade": 3, "world": "エアラインワールド（4年制）", "day": "水", "period": 5, "time": "１６：２０～１７：５０", "subject": "就職対策Ⅲ", "teacher": "内藤 法子", "room": "601", "note": ""}, {"grade": 3, "world": "エアラインワールド（4年制）", "day": "木", "period": 5, "time": "１６：２０～１７：５０", "subject": "ヨガ", "teacher": "山本 美穂", "room": "403・4", "note": "【THL選択】"}, {"grade": 3, "world": "エアラインワールド（4年制）", "day": "金", "period": 5, "time": "１６：２０～１７：５０", "subject": "韓国語", "teacher": "ILC", "room": "403・4", "note": "【THL選択】"}, {"grade": 3, "world": "観光ワールド（4年制）", "day": "月", "period": 1, "time": "９：００～１０：３０", "subject": "観光資源Ⅰ", "teacher": "黒田 尚嗣", "room": "502", "note": ""}, {"grade": 3, "world": "観光ワールド（4年制）", "day": "水", "period": 1, "time": "９：００～１０：３０", "subject": "ビジネス英会話Ⅱ", "teacher": "ILC", "room": "A：501", "note": "B：502 / C：503"}, {"grade": 3, "world": "観光ワールド（4年制）", "day": "木", "period": 1, "time": "９：００～１０：３０", "subject": "TOEIC", "teacher": "ILC", "room": "S：501", "note": "A：502 / B：503"}, {"grade": 3, "world": "観光ワールド（4年制）", "day": "金", "period": 1, "time": "９：００～１０：３０", "subject": "ビジネス英会話Ⅱ", "teacher": "ILC", "room": "A：501", "note": "B：502 / C：503"}, {"grade": 3, "world": "観光ワールド（4年制）", "day": "火", "period": 2, "time": "１０：４０～１２：１０", "subject": "動画撮影・編集", "teacher": "市川 大地", "room": "303", "note": ""}, {"grade": 3, "world": "観光ワールド（4年制）", "day": "木", "period": 2, "time": "１０：４０～１２：１０", "subject": "SNSプロモーション", "teacher": "Saori", "room": "【不定期授業】", "note": ""}, {"grade": 3, "world": "観光ワールド（4年制）", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "ビジネス英会話Ⅱ", "teacher": "ILC", "room": "A：501", "note": "B：502 / C：503"}, {"grade": 3, "world": "観光ワールド（4年制）", "day": "水", "period": 3, "time": "１３：0０～１４：３０", "subject": "手話", "teacher": "髙島 良宏", "room": "503", "note": ""}, {"grade": 3, "world": "観光ワールド（4年制）", "day": "木", "period": 3, "time": "１３：0０～１４：３０", "subject": "SNSプロモーション", "teacher": "Saori", "room": "【不定期授業】", "note": ""}, {"grade": 3, "world": "観光ワールド（4年制）", "day": "金", "period": 3, "time": "１３：0０～１４：３０", "subject": "トラベルマーケティング", "teacher": "小倉 通孝", "room": "401", "note": ""}, {"grade": 3, "world": "観光ワールド（4年制）", "day": "月", "period": 4, "time": "１４：４０～１６：１０", "subject": "TOEIC", "teacher": "ILC", "room": "S：501", "note": "A：502 / B：503"}, {"grade": 3, "world": "観光ワールド（4年制）", "day": "火", "period": 4, "time": "１４：４０～１６：１０", "subject": "世界遺産観光概論", "teacher": "佐藤 玲子", "room": "504", "note": ""}, {"grade": 3, "world": "観光ワールド（4年制）", "day": "水", "period": 4, "time": "１４：４０～１６：１０", "subject": "セルフディスカバリー", "teacher": "寺迫 寛子", "room": "501", "note": ""}, {"grade": 3, "world": "観光ワールド（4年制）", "day": "木", "period": 4, "time": "１４：４０～１６：１０", "subject": "ビジネス英会話Ⅱ", "teacher": "ILC", "room": "A：501", "note": "B：502 / C：503"}, {"grade": 3, "world": "観光ワールド（4年制）", "day": "月", "period": 5, "time": "１６：２０～１７：５０", "subject": "ゲーミング", "teacher": "平岡 里実", "room": "ゲーミングルーム", "note": "【THL選択】"}, {"grade": 3, "world": "観光ワールド（4年制）", "day": "火", "period": 5, "time": "１６：２０～１７：５０", "subject": "ヘアメイク＆スタイリング", "teacher": "関本 理恵", "room": "ビューティールーム", "note": "【THL選択】"}, {"grade": 3, "world": "観光ワールド（4年制）", "day": "水", "period": 5, "time": "１６：２０～１７：５０", "subject": "カメラワーク", "teacher": "田村 勇樹", "room": "403・4", "note": "【THL選択】"}, {"grade": 3, "world": "観光ワールド（4年制）", "day": "木", "period": 5, "time": "１６：２０～１７：５０", "subject": "ヨガ", "teacher": "山本 美穂", "room": "403・4", "note": "【THL選択】"}, {"grade": 3, "world": "観光ワールド（4年制）", "day": "金", "period": 5, "time": "１６：２０～１７：５０", "subject": "韓国語", "teacher": "ILC", "room": "403・4", "note": "【THL選択】"}, {"grade": 4, "world": "ホテルワールド（4年制）", "day": "月", "period": 1, "time": "９：００～１０：３０", "subject": "コーヒーの基礎知識", "teacher": "高見澤 肇", "room": "401 / カフェ", "note": "【THL選択】"}, {"grade": 4, "world": "ホテルワールド（4年制）", "day": "金", "period": 1, "time": "９：００～１０：３０", "subject": "韓国語", "teacher": "ILC", "room": "403・4", "note": "【THL選択】"}, {"grade": 4, "world": "ホテルワールド（4年制）", "day": "月", "period": 2, "time": "１０：４０～１２：１０", "subject": "卒業研究", "teacher": "小倉 一夫", "room": "303", "note": ""}, {"grade": 4, "world": "ホテルワールド（4年制）", "day": "火", "period": 2, "time": "１０：４０～１２：１０", "subject": "動画撮影・編集", "teacher": "市川 大地", "room": "303", "note": "観光3.4/スポーツ4"}, {"grade": 4, "world": "ホテルワールド（4年制）", "day": "木", "period": 2, "time": "１０：４０～１２：１０", "subject": "コンシェルジュゼミ", "teacher": "田隝 益美", "room": "403・4", "note": ""}, {"grade": 4, "world": "ホテルワールド（4年制）", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "卒業研究", "teacher": "小倉 一夫", "room": "303", "note": "卒業研究"}, {"grade": 4, "world": "ホテルワールド（4年制）", "day": "火", "period": 3, "time": "１３：0０～１４：３０", "subject": "セルフケア", "teacher": "曽根 美恵", "room": "401", "note": "観光・スポーツ4"}, {"grade": 4, "world": "ホテルワールド（4年制）", "day": "木", "period": 3, "time": "１３：0０～１４：３０", "subject": "コンシェルジュゼミ", "teacher": "田隝 益美", "room": "403・4", "note": ""}, {"grade": 4, "world": "ホテルワールド（4年制）", "day": "金", "period": 3, "time": "１３：0０～１４：３０", "subject": "レストランゼミ", "teacher": "宮崎 辰", "room": "バンケットルーム", "note": ""}, {"grade": 4, "world": "ホテルワールド（4年制）", "day": "月", "period": 4, "time": "１４：４０～１６：１０", "subject": "マネジメントゼミ", "teacher": "小倉 一夫", "room": "303", "note": "統計・分析"}, {"grade": 4, "world": "ホテルワールド（4年制）", "day": "火", "period": 4, "time": "１４：４０～１６：１０", "subject": "中国語", "teacher": "ILC", "room": "", "note": "オンデマンド"}, {"grade": 4, "world": "ホテルワールド（4年制）", "day": "水", "period": 4, "time": "１４：４０～１６：１０", "subject": "アルコールの基礎", "teacher": "富永 誠", "room": "403・4 / バンケットルーム", "note": "【THL選択】"}, {"grade": 4, "world": "ホテルワールド（4年制）", "day": "木", "period": 4, "time": "１４：４０～１６：１０", "subject": "中国語", "teacher": "ILC", "room": "504", "note": "対面"}, {"grade": 4, "world": "ホテルワールド（4年制）", "day": "金", "period": 4, "time": "１４：４０～１６：１０", "subject": "レストランゼミ", "teacher": "宮崎 辰", "room": "バンケットルーム", "note": ""}, {"grade": 4, "world": "ホテルワールド（4年制）", "day": "月", "period": 5, "time": "１６：２０～１７：５０", "subject": "マネジメントゼミ", "teacher": "小倉 一夫", "room": "303", "note": "統計・分析"}, {"grade": 4, "world": "ホテルワールド（4年制）", "day": "火", "period": 5, "time": "１６：２０～１７：５０", "subject": "ヘアメイク＆スタイリング", "teacher": "関本 理恵", "room": "ビューティールーム", "note": "【THL選択】"}, {"grade": 4, "world": "ホテルワールド（4年制）", "day": "水", "period": 5, "time": "１６：２０～１７：５０", "subject": "カメラワーク", "teacher": "田村 勇樹", "room": "403・4", "note": "【THL選択】"}, {"grade": 4, "world": "ホテルワールド（4年制）", "day": "木", "period": 5, "time": "１６：２０～１７：５０", "subject": "ヨガ", "teacher": "山本 美穂", "room": "403・4", "note": "【THL選択】"}, {"grade": 4, "world": "ホテルワールド（4年制）", "day": "金", "period": 5, "time": "１６：２０～１７：５０", "subject": "AIリテラシー基礎と生成AIの実践活用", "teacher": "倉持 健史", "room": "501", "note": ""}, {"grade": 4, "world": "ホテルワールド（4年制）", "day": "月", "period": 5, "time": "１６：２０～１７：５０", "subject": "ゲーミング", "teacher": "平岡 里実", "room": "ゲーミングルーム", "note": "【THL選択】"}, {"grade": 4, "world": "ホテルワールド（4年制）", "day": "火", "period": 5, "time": "１６：２０～１７：５０", "subject": "※マネジメントゼミ未選択者は、\n「ゲーミング」の選択授業が受講可能です。", "teacher": "", "room": "", "note": ""}, {"grade": 4, "world": "エアラインワールド（4年制）", "day": "月", "period": 1, "time": "９：００～１０：３０", "subject": "コーヒーの基礎知識", "teacher": "高見澤 肇", "room": "401 / カフェ", "note": "【THL選択】"}, {"grade": 4, "world": "エアラインワールド（4年制）", "day": "火", "period": 1, "time": "９：００～１０：３０", "subject": "就職対策Ⅳ", "teacher": "内藤 法子", "room": "601", "note": ""}, {"grade": 4, "world": "エアラインワールド（4年制）", "day": "木", "period": 1, "time": "９：００～１０：３０", "subject": "TOEIC", "teacher": "ILC", "room": "S：501", "note": "A：502 / B：503"}, {"grade": 4, "world": "エアラインワールド（4年制）", "day": "金", "period": 1, "time": "９：００～１０：３０", "subject": "韓国語", "teacher": "ILC", "room": "403・4", "note": "【THL選択】"}, {"grade": 4, "world": "エアラインワールド（4年制）", "day": "火", "period": 2, "time": "１０：４０～１２：１０", "subject": "セルフケア", "teacher": "曽根 美恵", "room": "401", "note": "エア・ブライダル"}, {"grade": 4, "world": "エアラインワールド（4年制）", "day": "金", "period": 2, "time": "１０：４０～１２：１０", "subject": "SPI対策", "teacher": "岡野 朋一", "room": "403・404", "note": ""}, {"grade": 4, "world": "エアラインワールド（4年制）", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "成長学・ストレスマネジメント", "teacher": "遠矢 浩和", "room": "504", "note": ""}, {"grade": 4, "world": "エアラインワールド（4年制）", "day": "水", "period": 3, "time": "１３：0０～１４：３０", "subject": "手話", "teacher": "髙島 良宏", "room": "503", "note": "【選択】"}, {"grade": 4, "world": "エアラインワールド（4年制）", "day": "金", "period": 3, "time": "１３：0０～１４：３０", "subject": "SPI対策", "teacher": "岡野 朋一", "room": "403・404", "note": ""}, {"grade": 4, "world": "エアラインワールド（4年制）", "day": "月", "period": 4, "time": "１４：４０～１６：１０", "subject": "TOEIC", "teacher": "ILC", "room": "S：501", "note": "A：502 / B：503"}, {"grade": 4, "world": "エアラインワールド（4年制）", "day": "火", "period": 4, "time": "１４：４０～１６：１０", "subject": "中国語", "teacher": "ILC", "room": "", "note": "オンデマンド"}, {"grade": 4, "world": "エアラインワールド（4年制）", "day": "水", "period": 4, "time": "１４：４０～１６：１０", "subject": "アルコールの基礎", "teacher": "富永 誠", "room": "403・4 / バンケットルーム", "note": "【THL選択】"}, {"grade": 4, "world": "エアラインワールド（4年制）", "day": "木", "period": 4, "time": "１４：４０～１６：１０", "subject": "中国語", "teacher": "ILC", "room": "504", "note": "対面"}, {"grade": 4, "world": "エアラインワールド（4年制）", "day": "月", "period": 5, "time": "１６：２０～１７：５０", "subject": "ゲーミング", "teacher": "平岡 里実", "room": "ゲーミングルーム", "note": "【THL選択】"}, {"grade": 4, "world": "エアラインワールド（4年制）", "day": "火", "period": 5, "time": "１６：２０～１７：５０", "subject": "ヘアメイク＆スタイリング", "teacher": "関本 理恵", "room": "ビューティールーム", "note": "【THL選択】"}, {"grade": 4, "world": "エアラインワールド（4年制）", "day": "水", "period": 5, "time": "１６：２０～１７：５０", "subject": "カメラワーク", "teacher": "田村 勇樹", "room": "403・4", "note": "【THL選択】"}, {"grade": 4, "world": "エアラインワールド（4年制）", "day": "木", "period": 5, "time": "１６：２０～１７：５０", "subject": "ヨガ", "teacher": "山本 美穂", "room": "403・4", "note": "【THL選択】"}, {"grade": 4, "world": "エアラインワールド（4年制）", "day": "金", "period": 5, "time": "１６：２０～１７：５０", "subject": "韓国語", "teacher": "ILC", "room": "403・4", "note": "【THL選択】"}, {"grade": 4, "world": "観光ワールド（4年制）", "day": "月", "period": 1, "time": "９：００～１０：３０", "subject": "コーヒーの基礎知識", "teacher": "高見澤 肇", "room": "401 / カフェ", "note": "【THL選択】"}, {"grade": 4, "world": "観光ワールド（4年制）", "day": "木", "period": 1, "time": "９：００～１０：３０", "subject": "TOEIC", "teacher": "ILC", "room": "S：501 / A：502", "note": "B:503"}, {"grade": 4, "world": "観光ワールド（4年制）", "day": "金", "period": 1, "time": "９：００～１０：３０", "subject": "韓国語", "teacher": "ILC", "room": "403・4", "note": "【THL選択】"}, {"grade": 4, "world": "観光ワールド（4年制）", "day": "火", "period": 2, "time": "１０：４０～１２：１０", "subject": "動画撮影・編集", "teacher": "市川 大地", "room": "303", "note": ""}, {"grade": 4, "world": "観光ワールド（4年制）", "day": "木", "period": 2, "time": "１０：４０～１２：１０", "subject": "SNSプロモーション", "teacher": "Saori", "room": "【不定期授業】", "note": ""}, {"grade": 4, "world": "観光ワールド（4年制）", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "滋慶選択", "teacher": "", "room": "", "note": ""}, {"grade": 4, "world": "観光ワールド（4年制）", "day": "火", "period": 3, "time": "１３：0０～１４：３０", "subject": "セルフケア", "teacher": "曽根 美恵", "room": "401", "note": ""}, {"grade": 4, "world": "観光ワールド（4年制）", "day": "水", "period": 3, "time": "１３：0０～１４：３０", "subject": "手話", "teacher": "髙島 良宏", "room": "503", "note": ""}, {"grade": 4, "world": "観光ワールド（4年制）", "day": "木", "period": 3, "time": "１３：0０～１４：３０", "subject": "SNSプロモーション", "teacher": "Saori", "room": "【不定期授業】", "note": ""}, {"grade": 4, "world": "観光ワールド（4年制）", "day": "金", "period": 3, "time": "１３：0０～１４：３０", "subject": "トラベルマーケティング", "teacher": "小倉 通孝", "room": "401", "note": ""}, {"grade": 4, "world": "観光ワールド（4年制）", "day": "月", "period": 4, "time": "１４：４０～１６：１０", "subject": "TOEIC", "teacher": "ILC", "room": "S：501 / A：502", "note": "B:503"}, {"grade": 4, "world": "観光ワールド（4年制）", "day": "火", "period": 4, "time": "１４：４０～１６：１０", "subject": "中国語", "teacher": "ILC", "room": "", "note": "オンデマンド"}, {"grade": 4, "world": "観光ワールド（4年制）", "day": "水", "period": 4, "time": "１４：４０～１６：１０", "subject": "セルフディスカバリー", "teacher": "寺迫 寛子", "room": "501", "note": ""}, {"grade": 4, "world": "観光ワールド（4年制）", "day": "木", "period": 4, "time": "１４：４０～１６：１０", "subject": "中国語", "teacher": "ILC", "room": "504", "note": ""}, {"grade": 4, "world": "観光ワールド（4年制）", "day": "月", "period": 5, "time": "１６：２０～１７：５０", "subject": "ゲーミング", "teacher": "平岡 里実", "room": "ゲーミングルーム", "note": "【THL選択】"}, {"grade": 4, "world": "観光ワールド（4年制）", "day": "火", "period": 5, "time": "１６：２０～１７：５０", "subject": "ヘアメイク＆スタイリング", "teacher": "関本 理恵", "room": "ビューティールーム", "note": "【THL選択】"}, {"grade": 4, "world": "観光ワールド（4年制）", "day": "水", "period": 5, "time": "１６：２０～１７：５０", "subject": "カメラワーク", "teacher": "田村 勇樹", "room": "403・4", "note": "【THL選択】"}, {"grade": 4, "world": "観光ワールド（4年制）", "day": "木", "period": 5, "time": "１６：２０～１７：５０", "subject": "ヨガ", "teacher": "山本 美穂", "room": "403・4", "note": "【THL選択】"}, {"grade": 4, "world": "観光ワールド（4年制）", "day": "金", "period": 5, "time": "１６：２０～１７：５０", "subject": "韓国語", "teacher": "ILC", "room": "403・4", "note": "【THL選択】"}];        // 前期 クラス時間割
-const PER=[{"grade": 3, "person": "ウェストブルーク ケント アラン", "day": "月", "period": 1, "time": "９：００～１０：３０", "subject": "コーヒーの基礎知識", "teacher": "高見澤 肇", "room": "503 / カフェ", "note": "【THL選択】"}, {"grade": 3, "person": "ウェストブルーク ケント アラン", "day": "火", "period": 1, "time": "９：００～１０：３０", "subject": "企業プロジェクト", "teacher": "亀山 和也", "room": "403・4", "note": ""}, {"grade": 3, "person": "ウェストブルーク ケント アラン", "day": "月", "period": 2, "time": "１０：４０～１２：１０", "subject": "バー・ラウンジサービス", "teacher": "栗原 幸代", "room": "1Fカフェ", "note": ""}, {"grade": 3, "person": "ウェストブルーク ケント アラン", "day": "火", "period": 2, "time": "１０：４０～１２：１０", "subject": "企業プロジェクト", "teacher": "亀山 和也", "room": "403・4", "note": ""}, {"grade": 3, "person": "ウェストブルーク ケント アラン", "day": "水", "period": 2, "time": "１０：４０～１２：１０", "subject": "手話", "teacher": "髙島 良宏", "room": "403・4", "note": ""}, {"grade": 3, "person": "ウェストブルーク ケント アラン", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "日本語", "teacher": "スクーリング", "room": "", "note": ""}, {"grade": 3, "person": "ウェストブルーク ケント アラン", "day": "火", "period": 3, "time": "１３：0０～１４：３０", "subject": "ホテル開発演習", "teacher": "小倉 一夫", "room": "303", "note": "ホテル開発"}, {"grade": 3, "person": "ウェストブルーク ケント アラン", "day": "水", "period": 3, "time": "１３：0０～１４：３０", "subject": "アルコールの知識", "teacher": "富永 誠", "room": "バンケットルーム", "note": ""}, {"grade": 3, "person": "ウェストブルーク ケント アラン", "day": "金", "period": 3, "time": "１３：0０～１４：３０", "subject": "レストランゼミ", "teacher": "宮崎 辰", "room": "バンケットルーム", "note": ""}, {"grade": 3, "person": "ウェストブルーク ケント アラン", "day": "月", "period": 4, "time": "１４：４０～１６：１０", "subject": "マネジメントゼミ", "teacher": "小倉 一夫", "room": "303", "note": "統計・分析"}, {"grade": 3, "person": "ウェストブルーク ケント アラン", "day": "火", "period": 4, "time": "１４：４０～１６：１０", "subject": "ホテル開発演習", "teacher": "小倉 一夫", "room": "303", "note": "ホテル開発"}, {"grade": 3, "person": "ウェストブルーク ケント アラン", "day": "水", "period": 4, "time": "１４：４０～１６：１０", "subject": "日本語", "teacher": "スクーリング", "room": "", "note": ""}, {"grade": 3, "person": "ウェストブルーク ケント アラン", "day": "金", "period": 4, "time": "１４：４０～１６：１０", "subject": "レストランゼミ", "teacher": "宮崎 辰", "room": "バンケットルーム", "note": ""}, {"grade": 3, "person": "ウェストブルーク ケント アラン", "day": "月", "period": 5, "time": "１６：２０～１７：５０", "subject": "マネジメントゼミ", "teacher": "小倉 一夫", "room": "303", "note": "統計・分析"}, {"grade": 3, "person": "ウェストブルーク ケント アラン", "day": "水", "period": 5, "time": "１６：２０～１７：５０", "subject": "カメラワーク", "teacher": "田村 勇樹", "room": "403・4", "note": "【THL選択】"}, {"grade": 3, "person": "リー ヒューバート", "day": "火", "period": 1, "time": "９：００～１０：３０", "subject": "企業プロジェクト", "teacher": "亀山 和也", "room": "403・4", "note": ""}, {"grade": 3, "person": "リー ヒューバート", "day": "月", "period": 2, "time": "１０：４０～１２：１０", "subject": "バー・ラウンジサービス", "teacher": "栗原 幸代", "room": "1Fカフェ", "note": ""}, {"grade": 3, "person": "リー ヒューバート", "day": "火", "period": 2, "time": "１０：４０～１２：１０", "subject": "企業プロジェクト", "teacher": "亀山 和也", "room": "403・4", "note": ""}, {"grade": 3, "person": "リー ヒューバート", "day": "水", "period": 2, "time": "１０：４０～１２：１０", "subject": "手話", "teacher": "髙島 良宏", "room": "403・4", "note": ""}, {"grade": 3, "person": "リー ヒューバート", "day": "木", "period": 2, "time": "１０：４０～１２：１０", "subject": "コンシェルジュゼミ", "teacher": "田隝 益美", "room": "303", "note": ""}, {"grade": 3, "person": "リー ヒューバート", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "日本語", "teacher": "JCIC", "room": "TSM 2F", "note": ""}, {"grade": 3, "person": "リー ヒューバート", "day": "火", "period": 3, "time": "１３：0０～１４：３０", "subject": "会話実践", "teacher": "TCA", "room": "TCA 136", "note": ""}, {"grade": 3, "person": "リー ヒューバート", "day": "水", "period": 3, "time": "１３：0０～１４：３０", "subject": "アルコールの知識", "teacher": "富永 誠", "room": "バンケットルーム", "note": ""}, {"grade": 3, "person": "リー ヒューバート", "day": "木", "period": 3, "time": "１３：0０～１４：３０", "subject": "コンシェルジュゼミ", "teacher": "田隝 益美", "room": "303", "note": ""}, {"grade": 3, "person": "リー ヒューバート", "day": "金", "period": 3, "time": "１３：0０～１４：３０", "subject": "レストランゼミ", "teacher": "宮崎 辰", "room": "バンケットルーム", "note": ""}, {"grade": 3, "person": "リー ヒューバート", "day": "月", "period": 4, "time": "１４：４０～１６：１０", "subject": "日本語", "teacher": "JCIC", "room": "TSM 2F", "note": ""}, {"grade": 3, "person": "リー ヒューバート", "day": "水", "period": 4, "time": "１４：４０～１６：１０", "subject": "日本語", "teacher": "スクーリング", "room": "", "note": ""}, {"grade": 3, "person": "リー ヒューバート", "day": "金", "period": 4, "time": "１４：４０～１６：１０", "subject": "レストランゼミ", "teacher": "宮崎 辰", "room": "バンケットルーム", "note": ""}, {"grade": 3, "person": "リー ヒューバート", "day": "月", "period": 5, "time": "１６：２０～１７：５０", "subject": "日本語", "teacher": "スクーリング", "room": "", "note": ""}, {"grade": 3, "person": "リー ヒューバート", "day": "水", "period": 5, "time": "１６：２０～１７：５０", "subject": "カメラワーク", "teacher": "田村 勇樹", "room": "403・4", "note": "【THL選択】"}, {"grade": 3, "person": "ジャヤコディ シルニ", "day": "月", "period": 1, "time": "９：００～１０：３０", "subject": "日本語", "teacher": "スクーリング", "room": "", "note": ""}, {"grade": 3, "person": "ジャヤコディ シルニ", "day": "火", "period": 1, "time": "９：００～１０：３０", "subject": "企業プロジェクト", "teacher": "亀山 和也", "room": "403・4", "note": ""}, {"grade": 3, "person": "ジャヤコディ シルニ", "day": "水", "period": 1, "time": "９：００～１０：３０", "subject": "日本語", "teacher": "スクーリング", "room": "", "note": ""}, {"grade": 3, "person": "ジャヤコディ シルニ", "day": "月", "period": 2, "time": "１０：４０～１２：１０", "subject": "バー・ラウンジサービス", "teacher": "栗原 幸代", "room": "1Fカフェ", "note": ""}, {"grade": 3, "person": "ジャヤコディ シルニ", "day": "火", "period": 2, "time": "１０：４０～１２：１０", "subject": "企業プロジェクト", "teacher": "亀山 和也", "room": "403・4", "note": ""}, {"grade": 3, "person": "ジャヤコディ シルニ", "day": "水", "period": 2, "time": "１０：４０～１２：１０", "subject": "手話", "teacher": "髙島 良宏", "room": "403・4", "note": ""}, {"grade": 3, "person": "ジャヤコディ シルニ", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "日本語", "teacher": "スクーリング", "room": "", "note": ""}, {"grade": 3, "person": "ジャヤコディ シルニ", "day": "火", "period": 3, "time": "１３：0０～１４：３０", "subject": "ホテル開発演習", "teacher": "小倉 一夫", "room": "303", "note": "ホテル開発"}, {"grade": 3, "person": "ジャヤコディ シルニ", "day": "水", "period": 3, "time": "１３：0０～１４：３０", "subject": "アルコールの知識", "teacher": "富永 誠", "room": "バンケットルーム", "note": ""}, {"grade": 3, "person": "ジャヤコディ シルニ", "day": "金", "period": 3, "time": "１３：0０～１４：３０", "subject": "レストランゼミ", "teacher": "宮崎 辰", "room": "バンケットルーム", "note": ""}, {"grade": 3, "person": "ジャヤコディ シルニ", "day": "月", "period": 4, "time": "１４：４０～１６：１０", "subject": "マネジメントゼミ", "teacher": "小倉 一夫", "room": "303", "note": "統計・分析"}, {"grade": 3, "person": "ジャヤコディ シルニ", "day": "火", "period": 4, "time": "１４：４０～１６：１０", "subject": "ホテル開発演習", "teacher": "小倉 一夫", "room": "303", "note": "ホテル開発"}, {"grade": 3, "person": "ジャヤコディ シルニ", "day": "金", "period": 4, "time": "１４：４０～１６：１０", "subject": "レストランゼミ", "teacher": "宮崎 辰", "room": "バンケットルーム", "note": ""}, {"grade": 3, "person": "ジャヤコディ シルニ", "day": "月", "period": 5, "time": "１６：２０～１７：５０", "subject": "マネジメントゼミ", "teacher": "小倉 一夫", "room": "303", "note": "統計・分析"}, {"grade": 3, "person": "ジャヤコディ シルニ", "day": "火", "period": 5, "time": "１６：２０～１７：５０", "subject": "ヘアメイク＆スタイリング", "teacher": "関本 理恵", "room": "ビューティールーム", "note": "【THL選択】"}, {"grade": 3, "person": "ジャヤコディ シルニ", "day": "金", "period": 5, "time": "１６：２０～１７：５０", "subject": "韓国語", "teacher": "ILC", "room": "403・4", "note": "【THL選択】"}, {"grade": 4, "person": "サレヒ マハディ", "day": "火", "period": 1, "time": "９：００～１０：３０", "subject": "企業プロジェクト", "teacher": "亀山 和也", "room": "403・4", "note": ""}, {"grade": 4, "person": "サレヒ マハディ", "day": "水", "period": 1, "time": "９：００～１０：３０", "subject": "ビジネス英会話Ⅱ", "teacher": "ILC", "room": "A：501", "note": "B：502 / C：503"}, {"grade": 4, "person": "サレヒ マハディ", "day": "金", "period": 1, "time": "９：００～１０：３０", "subject": "ビジネス英会話Ⅱ", "teacher": "ILC", "room": "A：501", "note": "B：502 / C：503"}, {"grade": 4, "person": "サレヒ マハディ", "day": "月", "period": 2, "time": "１０：４０～１２：１０", "subject": "バー・ラウンジサービス", "teacher": "栗原 幸代", "room": "1Fカフェ", "note": ""}, {"grade": 4, "person": "サレヒ マハディ", "day": "火", "period": 2, "time": "１０：４０～１２：１０", "subject": "企業プロジェクト", "teacher": "亀山 和也", "room": "403・4", "note": ""}, {"grade": 4, "person": "サレヒ マハディ", "day": "水", "period": 2, "time": "１０：４０～１２：１０", "subject": "手話", "teacher": "髙島 良宏", "room": "403・4", "note": ""}, {"grade": 4, "person": "サレヒ マハディ", "day": "木", "period": 2, "time": "１０：４０～１２：１０", "subject": "コンシェルジュゼミ", "teacher": "田隝 益美", "room": "303", "note": ""}, {"grade": 4, "person": "サレヒ マハディ", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "ビジネス英会話Ⅱ", "teacher": "ILC", "room": "A：501", "note": "B：502 / C：503"}, {"grade": 4, "person": "サレヒ マハディ", "day": "火", "period": 3, "time": "１３：0０～１４：３０", "subject": "セルフケア", "teacher": "曽根 美恵", "room": "401", "note": "観光・スポーツ4"}, {"grade": 4, "person": "サレヒ マハディ", "day": "水", "period": 3, "time": "１３：0０～１４：３０", "subject": "アルコールの知識", "teacher": "富永 誠", "room": "バンケットルーム", "note": ""}, {"grade": 4, "person": "サレヒ マハディ", "day": "木", "period": 3, "time": "１３：0０～１４：３０", "subject": "コンシェルジュゼミ", "teacher": "田隝 益美", "room": "303", "note": ""}, {"grade": 4, "person": "サレヒ マハディ", "day": "木", "period": 4, "time": "１４：４０～１６：１０", "subject": "ビジネス英会話Ⅱ", "teacher": "ILC", "room": "A：501", "note": "B：502 / C：503"}, {"grade": 4, "person": "サレヒ マハディ", "day": "水", "period": 5, "time": "１６：２０～１７：５０", "subject": "カメラワーク", "teacher": "田村 勇樹", "room": "403・4", "note": "【THL選択】"}, {"grade": 4, "person": "イエロウム リナ ザラ", "day": "月", "period": 1, "time": "９：００～１０：３０", "subject": "コーヒーの基礎知識", "teacher": "高見澤 肇", "room": "503 / カフェ", "note": "【THL選択】"}, {"grade": 4, "person": "イエロウム リナ ザラ", "day": "水", "period": 1, "time": "９：００～１０：３０", "subject": "ビジネス英会話Ⅱ", "teacher": "ILC", "room": "A：501", "note": "B：502 / C：503"}, {"grade": 4, "person": "イエロウム リナ ザラ", "day": "木", "period": 1, "time": "９：００～１０：３０", "subject": "TOEIC", "teacher": "ILC", "room": "S：501", "note": "A：502 / B：503"}, {"grade": 4, "person": "イエロウム リナ ザラ", "day": "金", "period": 1, "time": "９：００～１０：３０", "subject": "ビジネス英会話Ⅱ", "teacher": "ILC", "room": "A：501", "note": "B：502 / C：503"}, {"grade": 4, "person": "イエロウム リナ ザラ", "day": "月", "period": 2, "time": "１０：４０～１２：１０", "subject": "バー・ラウンジサービス", "teacher": "栗原 幸代", "room": "1Fカフェ", "note": ""}, {"grade": 4, "person": "イエロウム リナ ザラ", "day": "火", "period": 2, "time": "１０：４０～１２：１０", "subject": "フラワーコーディネート", "teacher": "星 麻美", "room": "ビューティールーム", "note": ""}, {"grade": 4, "person": "イエロウム リナ ザラ", "day": "水", "period": 2, "time": "１０：４０～１２：１０", "subject": "手話", "teacher": "髙島 良宏", "room": "403・4", "note": ""}, {"grade": 4, "person": "イエロウム リナ ザラ", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "ビジネス英会話Ⅱ", "teacher": "ILC", "room": "A：501", "note": "B：502 / C：503"}, {"grade": 4, "person": "イエロウム リナ ザラ", "day": "火", "period": 3, "time": "１３：0０～１４：３０", "subject": "セルフケア", "teacher": "曽根 美恵", "room": "401", "note": ""}, {"grade": 4, "person": "イエロウム リナ ザラ", "day": "水", "period": 3, "time": "１３：0０～１４：３０", "subject": "アルコールの知識", "teacher": "富永 誠", "room": "バンケットルーム", "note": ""}, {"grade": 4, "person": "イエロウム リナ ザラ", "day": "月", "period": 4, "time": "１４：４０～１６：１０", "subject": "TOEIC", "teacher": "ILC", "room": "S：501", "note": "A：502 / B：503"}, {"grade": 4, "person": "イエロウム リナ ザラ", "day": "火", "period": 4, "time": "１４：４０～１６：１０", "subject": "異文化理解", "teacher": "小池 美穂", "room": "402", "note": ""}, {"grade": 4, "person": "イエロウム リナ ザラ", "day": "水", "period": 4, "time": "１４：４０～１６：１０", "subject": "セルフディスカバリー", "teacher": "寺迫 寛子", "room": "501", "note": ""}, {"grade": 4, "person": "イエロウム リナ ザラ", "day": "木", "period": 4, "time": "１４：４０～１６：１０", "subject": "ビジネス英会話Ⅱ", "teacher": "ILC", "room": "A：501", "note": "B：502 / C：503"}, {"grade": 4, "person": "小泉 祐太", "day": "月", "period": 2, "time": "１０：４０～１２：１０", "subject": "卒業研究", "teacher": "小倉 一夫", "room": "303", "note": ""}, {"grade": 4, "person": "小泉 祐太", "day": "火", "period": 2, "time": "１０：４０～１２：１０", "subject": "動画撮影・編集", "teacher": "市川 大地", "room": "303", "note": "観光3.4/スポーツ4"}, {"grade": 4, "person": "小泉 祐太", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "卒業研究", "teacher": "小倉 一夫", "room": "303", "note": "卒業研究"}, {"grade": 4, "person": "小泉 祐太", "day": "火", "period": 3, "time": "１３：0０～１４：３０", "subject": "セルフケア", "teacher": "曽根 美恵", "room": "401", "note": "観光・スポーツ4"}, {"grade": 4, "person": "小泉 祐太", "day": "月", "period": 4, "time": "１４：４０～１６：１０", "subject": "マネジメントゼミ", "teacher": "小倉 一夫", "room": "303", "note": "統計・分析"}, {"grade": 4, "person": "小泉 祐太", "day": "火", "period": 4, "time": "１４：４０～１６：１０", "subject": "中国語", "teacher": "ILC", "room": "", "note": "オンデマンド"}, {"grade": 4, "person": "小泉 祐太", "day": "水", "period": 4, "time": "１４：４０～１６：１０", "subject": "アルコールの基礎", "teacher": "富永 誠", "room": "403・4 / バンケットルーム", "note": "【THL選択】"}, {"grade": 4, "person": "小泉 祐太", "day": "木", "period": 4, "time": "１４：４０～１６：１０", "subject": "中国語", "teacher": "ILC", "room": "504", "note": "対面"}, {"grade": 4, "person": "小泉 祐太", "day": "月", "period": 5, "time": "１６：２０～１７：５０", "subject": "マネジメントゼミ", "teacher": "小倉 一夫", "room": "303", "note": "統計・分析"}, {"grade": 4, "person": "小泉 祐太", "day": "水", "period": 5, "time": "１６：２０～１７：５０", "subject": "カメラワーク", "teacher": "田村 勇樹", "room": "403・4", "note": "【THL選択】"}, {"grade": 4, "person": "小泉 祐太", "day": "木", "period": 5, "time": "１６：２０～１７：５０", "subject": "ヨガ", "teacher": "山本 美穂", "room": "403・4", "note": "【THL選択】"}, {"grade": 4, "person": "小泉 祐太", "day": "金", "period": 5, "time": "１６：２０～１７：５０", "subject": "AIリテラシー基礎と生成AIの実践活用", "teacher": "倉持 健史", "room": "501", "note": ""}, {"grade": 4, "person": "齋藤 礼奈", "day": "火", "period": 1, "time": "９：００～１０：３０", "subject": "スクーリング④", "teacher": "", "room": "", "note": ""}, {"grade": 4, "person": "齋藤 礼奈", "day": "金", "period": 1, "time": "９：００～１０：３０", "subject": "スクーリング⑧", "teacher": "", "room": "", "note": ""}, {"grade": 4, "person": "齋藤 礼奈", "day": "月", "period": 2, "time": "１０：４０～１２：１０", "subject": "スクーリング①", "teacher": "", "room": "", "note": ""}, {"grade": 4, "person": "齋藤 礼奈", "day": "火", "period": 2, "time": "１０：４０～１２：１０", "subject": "動画撮影・編集", "teacher": "市川 大地", "room": "303", "note": "観光3.4/スポーツ4"}, {"grade": 4, "person": "齋藤 礼奈", "day": "木", "period": 2, "time": "１０：４０～１２：１０", "subject": "スクーリング⑥", "teacher": "", "room": "", "note": ""}, {"grade": 4, "person": "齋藤 礼奈", "day": "金", "period": 2, "time": "１０：４０～１２：１０", "subject": "スクーリング⑨", "teacher": "", "room": "", "note": ""}, {"grade": 4, "person": "齋藤 礼奈", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "スクーリング②", "teacher": "", "room": "", "note": ""}, {"grade": 4, "person": "齋藤 礼奈", "day": "火", "period": 3, "time": "１３：0０～１４：３０", "subject": "セルフケア", "teacher": "曽根 美恵", "room": "401", "note": "観光・スポーツ4"}, {"grade": 4, "person": "齋藤 礼奈", "day": "木", "period": 3, "time": "１３：0０～１４：３０", "subject": "スクーリング⑦", "teacher": "", "room": "", "note": ""}, {"grade": 4, "person": "齋藤 礼奈", "day": "金", "period": 3, "time": "１３：0０～１４：３０", "subject": "スクーリング⑩", "teacher": "", "room": "", "note": ""}, {"grade": 4, "person": "齋藤 礼奈", "day": "月", "period": 4, "time": "１４：４０～１６：１０", "subject": "スクーリング③", "teacher": "", "room": "", "note": ""}, {"grade": 4, "person": "齋藤 礼奈", "day": "火", "period": 4, "time": "１４：４０～１６：１０", "subject": "スクーリング⑤", "teacher": "", "room": "", "note": ""}, {"grade": 4, "person": "齋藤 礼奈", "day": "木", "period": 4, "time": "１４：４０～１６：１０", "subject": "中国語", "teacher": "ILC", "room": "504", "note": "対面"}, {"grade": 4, "person": "齋藤 礼奈", "day": "金", "period": 4, "time": "１４：４０～１６：１０", "subject": "スクーリング⑪", "teacher": "", "room": "", "note": ""}, {"grade": 4, "person": "齋藤 礼奈", "day": "月", "period": 5, "time": "１６：２０～１７：５０", "subject": "イラスト基礎", "teacher": "滋慶選択", "room": "東京アニメ・声優&eスポーツ専門学校", "note": ""}, {"grade": 4, "person": "齋藤 礼奈", "day": "火", "period": 5, "time": "１６：２０～１７：５０", "subject": "中国語", "teacher": "ILC", "room": "", "note": "オンデマンド"}, {"grade": 4, "person": "齋藤 礼奈", "day": "金", "period": 5, "time": "１６：２０～１７：５０", "subject": "AIリテラシー基礎と生成AIの実践活用", "teacher": "倉持 健史", "room": "501", "note": ""}, {"grade": 4, "person": "佐々木彩乃", "day": "月", "period": 1, "time": "９：００～１０：３０", "subject": "コーヒーの基礎知識", "teacher": "高見澤 肇", "room": "503 / カフェ", "note": "【THL選択】"}, {"grade": 4, "person": "佐々木彩乃", "day": "火", "period": 1, "time": "９：００～１０：３０", "subject": "就職対策Ⅳ", "teacher": "内藤 法子", "room": "601", "note": ""}, {"grade": 4, "person": "佐々木彩乃", "day": "木", "period": 1, "time": "９：００～１０：３０", "subject": "TOEIC", "teacher": "ILC", "room": "Aクラス", "note": ""}, {"grade": 4, "person": "佐々木彩乃", "day": "火", "period": 2, "time": "１０：４０～１２：１０", "subject": "セルフケア", "teacher": "曽根 美恵", "room": "401", "note": "エア・ブライダル"}, {"grade": 4, "person": "佐々木彩乃", "day": "金", "period": 2, "time": "１０：４０～１２：１０", "subject": "SPI対策", "teacher": "岡野 朋一", "room": "403・404", "note": ""}, {"grade": 4, "person": "佐々木彩乃", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "成長学・ストレスマネジメント", "teacher": "遠矢 浩和", "room": "504", "note": ""}, {"grade": 4, "person": "佐々木彩乃", "day": "木", "period": 3, "time": "１３：0０～１４：３０", "subject": "時事研究", "teacher": "本田 名智", "room": "601", "note": ""}, {"grade": 4, "person": "佐々木彩乃", "day": "金", "period": 3, "time": "１３：0０～１４：３０", "subject": "SPI対策", "teacher": "岡野 朋一", "room": "403・404", "note": ""}, {"grade": 4, "person": "佐々木彩乃", "day": "月", "period": 4, "time": "１４：４０～１６：１０", "subject": "TOEIC", "teacher": "ILC", "room": "Aクラス", "note": ""}, {"grade": 4, "person": "佐々木彩乃", "day": "火", "period": 4, "time": "１４：４０～１６：１０", "subject": "中国語", "teacher": "ILC", "room": "", "note": "オンデマンド"}, {"grade": 4, "person": "佐々木彩乃", "day": "水", "period": 4, "time": "１４：４０～１６：１０", "subject": "アルコールの基礎", "teacher": "富永 誠", "room": "403・4 / バンケットルーム", "note": "【THL選択】"}, {"grade": 4, "person": "佐々木彩乃", "day": "木", "period": 4, "time": "１４：４０～１６：１０", "subject": "中国語", "teacher": "ILC", "room": "504", "note": "対面"}, {"grade": 4, "person": "佐々木彩乃", "day": "金", "period": 5, "time": "１６：２０～１７：５０", "subject": "韓国語", "teacher": "ILC", "room": "403・4", "note": "【THL選択】"}, {"grade": 1, "person": "トニチュ ブリアナ", "day": "月", "period": 1, "time": "９：００～１０：３０", "subject": "観光概論", "teacher": "長木 利通", "room": "501", "note": ""}, {"grade": 1, "person": "トニチュ ブリアナ", "day": "火", "period": 1, "time": "９：００～１０：３０", "subject": "観光イベントプランニング", "teacher": "神崎 公一", "room": "502", "note": ""}, {"grade": 1, "person": "トニチュ ブリアナ", "day": "水", "period": 1, "time": "９：００～１０：３０", "subject": "IT基礎知識", "teacher": "田村 勇樹", "room": "401", "note": ""}, {"grade": 1, "person": "トニチュ ブリアナ", "day": "木", "period": 1, "time": "９：００～１０：３０", "subject": "JLPT N1", "teacher": "", "room": "TCA", "note": ""}, {"grade": 1, "person": "トニチュ ブリアナ", "day": "月", "period": 2, "time": "１０：４０～１２：１０", "subject": "ツアー企画", "teacher": "黒田 尚嗣", "room": "502", "note": ""}, {"grade": 1, "person": "トニチュ ブリアナ", "day": "火", "period": 2, "time": "１０：４０～１２：１０", "subject": "会話実践", "teacher": "", "room": "TCA", "note": ""}, {"grade": 1, "person": "トニチュ ブリアナ", "day": "水", "period": 2, "time": "１０：４０～１２：１０", "subject": "イベント企画", "teacher": "青木 思生", "room": "601", "note": ""}, {"grade": 1, "person": "トニチュ ブリアナ", "day": "木", "period": 2, "time": "１０：４０～１２：１０", "subject": "チームビルディング", "teacher": "塩家 吹雪", "room": "601", "note": ""}, {"grade": 1, "person": "トニチュ ブリアナ", "day": "金", "period": 2, "time": "１０：４０～１２：１０", "subject": "観光概論基礎Ⅰ", "teacher": "弓野 克彦", "room": "303", "note": ""}, {"grade": 1, "person": "トニチュ ブリアナ", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "キャリアプログラム", "teacher": "担任", "room": "601", "note": ""}, {"grade": 1, "person": "トニチュ ブリアナ", "day": "火", "period": 3, "time": "１３：0０～１４：３０", "subject": "ONSENガストロノミーⅠ", "teacher": "溝田 祐一郎", "room": "502", "note": ""}, {"grade": 1, "person": "トニチュ ブリアナ", "day": "水", "period": 3, "time": "１３：0０～１４：３０", "subject": "地域コンシェルジュ", "teacher": "竹内 秀次郎", "room": "403・4", "note": "【6/17・9/9の2回実施】"}, {"grade": 1, "person": "トニチュ ブリアナ", "day": "木", "period": 3, "time": "１３：0０～１４：３０", "subject": "JLPT N1", "teacher": "スクーリング", "room": "THL", "note": ""}, {"grade": 1, "person": "トニチュ ブリアナ", "day": "金", "period": 3, "time": "１３：0０～１４：３０", "subject": "インバウンドビジネス論", "teacher": "弓野 克彦", "room": "303", "note": ""}, {"grade": 1, "person": "トニチュ ブリアナ", "day": "金", "period": 4, "time": "１４：４０～１６：１０", "subject": "ホスピタリティコミュニケーション", "teacher": "城 万紀子", "room": "403・4", "note": "10回"}, {"grade": 2, "person": "グルンアミサ", "day": "月", "period": 1, "time": "９：００～１０：３０", "subject": "JLPT N1", "teacher": "", "room": "TCA", "note": ""}, {"grade": 2, "person": "グルンアミサ", "day": "火", "period": 1, "time": "９：００～１０：３０", "subject": "英会話Ⅲ", "teacher": "ILC", "room": "A：501 / B：504", "note": ""}, {"grade": 2, "person": "グルンアミサ", "day": "木", "period": 1, "time": "９：００～１０：３０", "subject": "TOEIC", "teacher": "ILC", "room": "S：501 / A：502", "note": "B:503"}, {"grade": 2, "person": "グルンアミサ", "day": "金", "period": 1, "time": "９：００～１０：３０", "subject": "韓国語", "teacher": "ILC", "room": "403・4", "note": "【THL選択】"}, {"grade": 2, "person": "グルンアミサ", "day": "月", "period": 2, "time": "１０：４０～１２：１０", "subject": "異文化交流", "teacher": "佐藤 玲子", "room": "403・4", "note": ""}, {"grade": 2, "person": "グルンアミサ", "day": "火", "period": 2, "time": "１０：４０～１２：１０", "subject": "会話実践", "teacher": "", "room": "TCA", "note": ""}, {"grade": 2, "person": "グルンアミサ", "day": "水", "period": 2, "time": "１０：４０～１２：１０", "subject": "接客シミュレーション", "teacher": "内藤 法子", "room": "エアラインルーム", "note": ""}, {"grade": 2, "person": "グルンアミサ", "day": "木", "period": 2, "time": "１０：４０～１２：１０", "subject": "英会話Ⅲ", "teacher": "ILC", "room": "A：501 / B：504", "note": ""}, {"grade": 2, "person": "グルンアミサ", "day": "金", "period": 2, "time": "１０：４０～１２：１０", "subject": "英会話Ⅲ", "teacher": "ILC", "room": "A：501 / B：504", "note": ""}, {"grade": 2, "person": "グルンアミサ", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "異文化交流", "teacher": "佐藤 玲子", "room": "403・4", "note": ""}, {"grade": 2, "person": "グルンアミサ", "day": "火", "period": 3, "time": "１３：0０～１４：３０", "subject": "日本の伝統文化", "teacher": "佐藤 玲子", "room": "403・4", "note": ""}, {"grade": 2, "person": "グルンアミサ", "day": "水", "period": 3, "time": "１３：0０～１４：３０", "subject": "英会話Ⅲ", "teacher": "ILC", "room": "A：501 / B：504", "note": ""}, {"grade": 2, "person": "グルンアミサ", "day": "木", "period": 3, "time": "１３：0０～１４：３０", "subject": "JLPT N1", "teacher": "スクーリング", "room": "THL", "note": ""}, {"grade": 2, "person": "グルンアミサ", "day": "月", "period": 4, "time": "１４：４０～１６：１０", "subject": "TOEIC", "teacher": "ILC", "room": "S：501", "note": "A：502 / B：503"}, {"grade": 2, "person": "グルンアミサ", "day": "火", "period": 4, "time": "１４：４０～１６：１０", "subject": "航空知識Ⅱ", "teacher": "平地 和恵", "room": "601", "note": ""}, {"grade": 2, "person": "グルンアミサ", "day": "水", "period": 5, "time": "１６：２０～１７：５０", "subject": "業界研究", "teacher": "岡本 真理", "room": "501", "note": ""}, {"grade": 2, "person": "ナンディン", "day": "月", "period": 1, "time": "９：００～１０：３０", "subject": "観光資源Ⅰ", "teacher": "黒田 尚嗣", "room": "502", "note": ""}, {"grade": 2, "person": "ナンディン", "day": "火", "period": 1, "time": "９：００～１０：３０", "subject": "英会話Ⅲ", "teacher": "ILC", "room": "B：504", "note": ""}, {"grade": 2, "person": "ナンディン", "day": "木", "period": 1, "time": "９：００～１０：３０", "subject": "TOEIC", "teacher": "ILC", "room": "", "note": "B：503"}, {"grade": 2, "person": "ナンディン", "day": "月", "period": 2, "time": "１０：４０～１２：１０", "subject": "異文化交流", "teacher": "佐藤 玲子", "room": "403・4", "note": ""}, {"grade": 2, "person": "ナンディン", "day": "火", "period": 2, "time": "１０：４０～１２：１０", "subject": "ONSENガストロノミーⅡ", "teacher": "溝田 祐一郎", "room": "302", "note": ""}, {"grade": 2, "person": "ナンディン", "day": "水", "period": 2, "time": "１０：４０～１２：１０", "subject": "イベント企画", "teacher": "青木 思生", "room": "601", "note": ""}, {"grade": 2, "person": "ナンディン", "day": "木", "period": 2, "time": "１０：４０～１２：１０", "subject": "英会話Ⅲ", "teacher": "ILC", "room": "B：504", "note": ""}, {"grade": 2, "person": "ナンディン", "day": "金", "period": 2, "time": "１０：４０～１２：１０", "subject": "英会話Ⅲ", "teacher": "ILC", "room": "B：504", "note": ""}, {"grade": 2, "person": "ナンディン", "day": "月", "period": 3, "time": "１３：0０～１４：３０", "subject": "異文化交流", "teacher": "佐藤 玲子", "room": "403・4", "note": ""}, {"grade": 2, "person": "ナンディン", "day": "火", "period": 3, "time": "１３：0０～１４：３０", "subject": "日本の伝統文化", "teacher": "佐藤 玲子", "room": "403・4", "note": ""}, {"grade": 2, "person": "ナンディン", "day": "水", "period": 3, "time": "１３：0０～１４：３０", "subject": "英会話Ⅲ", "teacher": "ILC", "room": "B：504", "note": ""}, {"grade": 2, "person": "ナンディン", "day": "金", "period": 3, "time": "１３：0０～１４：３０", "subject": "インバウンドビジネス論", "teacher": "弓野 克彦", "room": "303", "note": ""}, {"grade": 2, "person": "ナンディン", "day": "月", "period": 4, "time": "１４：４０～１６：１０", "subject": "TOEIC", "teacher": "ILC", "room": "", "note": "B：503"}, {"grade": 2, "person": "ナンディン", "day": "火", "period": 4, "time": "１４：４０～１６：１０", "subject": "旅行業実践学", "teacher": "名鉄観光", "room": "501", "note": ""}, {"grade": 2, "person": "ナンディン", "day": "火", "period": 5, "time": "１６：２０～１７：５０", "subject": "旅行業実践学", "teacher": "名鉄観光", "room": "501", "note": "【不定期授業】"}, {"grade": 2, "person": "ナンディン", "day": "金", "period": 5, "time": "１６：２０～１７：５０", "subject": "韓国語", "teacher": "ILC", "room": "403・4", "note": "【THL選択】"}];        // 前期 学生別
-const OPT={"subjects": ["AIリテラシー", "AIリテラシー基礎と生成AIの実践活用", "BIA対策講座（2級）", "BIA対策講座（3級）", "IT基礎知識", "IT基礎知識Ⅰ", "JALキャリアプログラム", "ONSENガストロノミーⅠ", "ONSENガストロノミーⅡ", "SNSプロモーション", "SPI対策", "Self Development", "TOEIC", "WEBデザイン", "※マネジメントゼミ未選択者は、\n「ゲーミング」の選択授業が受講可能です。", "【GSのみ】就職対策基礎", "アルコールの基礎", "アルコールの知識", "イベント企画", "イベント企画Ⅱ", "インバウンドビジネス論", "エアラインマナー", "カメラワーク", "キャリアデザイン", "キャリアプログラム", "キャリアプログラムⅠ", "キャリアプログラムⅡ", "ゲーミング", "コンシェルジュゼミ", "コーヒーの基礎知識", "サービストレーニング", "サービス基礎", "サービス基礎（A）", "サービス基礎（B）", "セルフアップビューティー", "セルフケア", "セルフディスカバリー", "セルフマネジメントⅠ", "セルフメイク", "チームビルディング", "ツアー企画", "テーブルコーディネート", "デジタルマーケティング", "トラベルマーケティング", "ドレススタイリング", "ドレスメンテナンス", "バー・ラウンジサービス", "パーソナルカラー", "ビジネス英会話Ⅱ", "フラワーコーディネート", "ブライダルの演出", "ブライダルビジネスⅠ", "ブライダルビジネスⅠ／映像編集", "ブライダルビジョン", "ブライダルフェア", "ブライダルプランニングⅡ", "ブライダル基礎", "ヘアメイク＆スタイリング", "ホスピタリティコミュニケーション", "ホテルビジネス", "ホテル接客基礎", "ホテル開発演習", "マネジメントゼミ", "マネジメント入門Ⅰ", "ヨガ", "レストランゼミ", "世界遺産観光概論", "中国語", "企業プロジェクト", "会計学", "動画撮影・編集", "卒業研究", "和装着付け実習", "地域コンシェルジュ", "宿泊入門", "就活対策講座", "就職対策Ⅰ", "就職対策Ⅱ", "就職対策Ⅲ", "就職対策Ⅳ", "店舗接客Ⅱ", "店舗接客Ⅲ", "成長学・ストレスマネジメント", "手話", "接客シミュレーション", "旅行業実践学", "日本の伝統文化", "映像編集", "時事研究", "服飾史", "業界研究", "業界研究Ⅲ", "滋慶選択", "異文化交流", "異文化理解", "航空業界基礎知識", "航空知識Ⅰ", "航空知識Ⅱ", "航空知識Ⅲ", "英会話Ⅰ", "英会話Ⅲ", "表現力コミュニケーション", "観光イベントプランニング", "観光概論", "観光概論基礎Ⅰ", "観光資源Ⅰ", "韓国語", "音響・音楽"], "teachers": ["ILC", "Saori", "上山 翔太郎", "上山翔太郎", "下辻 久子", "中野 智", "亀山 和也", "井上 勝馬", "佐藤 玲子", "倉持 健史", "八芳園", "内藤 法子", "北村 広一", "名鉄観光", "城 万紀子", "塩家 吹雪", "宮崎 辰", "富永 誠", "寺迫 寛子", "小倉 一夫", "小倉 通孝", "小池 美穂", "山本 美穂", "岡本 真理", "岡村 奈奈", "岡野 朋一", "市川 大地", "平地 和恵", "平岡 里実", "弓野 克彦", "担任", "日本航空", "早坂 英里", "星 麻美", "曽根 美恵", "服部 陵子", "本田 名智", "栗原 幸代", "櫻井 まどか", "武田 絢子", "津本 さおり", "渡辺 亜希子", "渡邊 昌恵", "溝田 祐一郎", "田村 勇樹", "田村 勇樹 ", "田隝 益美", "矢島 慶佑", "石原 健", "石垣 利恵", "神崎 公一", "竹内 秀次郎", "遠矢 浩和", "遠藤 孝博", "長木 利通", "関本 利恵", "関本 理恵", "青木 思生", "高見澤 肇", "髙島 良宏", "黒田 尚嗣"], "rooms": ["1Fカフェ", "302", "303", "401", "401 / カフェ", "402", "402/401", "403・4", "403・4 / バンケットルーム", "403・404", "501", "502", "503", "503 / カフェ", "504", "601", "A：501", "A：501 / B：504", "B1：501 / B2：502", "S：501", "S：501 / A：502", "【不定期授業】", "エアラインルーム", "エアラインルーム", "ゲストルーム", "ゲーミングルーム", "ドレスルーム", "バンケットルーム", "バンケットルーム/401", "ビューティールーム", "地域コンシェルジュ 【不定期授業】"], "world_by_grade": {"1": ["エアラインワールド（3年制・4年制）", "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "ブライダルワールド【プランナーコース】（3年制）", "ホテルワールド（3年制・4年制）", "観光ワールド（4年制）"], "2": ["エアラインワールド（3年制・4年制）", "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "ブライダルワールド【プランナーコース】（3年制）", "ホテルワールド（3年制・4年制）", "観光ワールド（4年制）"], "3": ["エアラインワールド（4年制）", "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "ブライダルワールド【プランナーコース】（3年制）", "ホテルワールド（3年制・4年制）", "観光ワールド（4年制）"], "4": ["エアラインワールド（4年制）", "ホテルワールド（4年制）", "観光ワールド（4年制）"]}, "rooms_clean": ["302", "303", "401", "402", "403・4", "501", "502", "503", "504", "601", "1Fカフェ", "エアラインルーム", "ゲストルーム", "ゲーミングルーム", "ドレスルーム", "バンケットルーム", "ビューティールーム"]};        // 入力候補・学年別ワールド
-const ROOMS=["302", "303", "401", "402", "403・4", "501", "502", "503", "504", "601", "1Fカフェ", "エアラインルーム", "ゲストルーム", "ゲーミングルーム", "ドレスルーム", "バンケットルーム", "ビューティールーム"];    // 教室リスト
-const DAYS=["月","火","水","木","金"];
-const PERIODS=[1,2,3,4,5];
-const PTIME={1:"９：００〜",2:"１０：４０〜",3:"１３：００〜",4:"１４：４０〜",5:"１６：２０〜"};
-const PTIME_FULL={1:"９：００〜１０：３０",2:"１０：４０〜１２：１０",3:"１３：００〜１４：３０",4:"１４：４０〜１６：１０",5:"１６：２０〜１７：５０"};
-const PRANGE={1:[540,630],2:[640,730],3:[780,870],4:[880,970],5:[980,1070]};
-const WORLD_ORDER=["ホテルワールド","ブライダルワールド【プランナーコース】","ブライダルワールド【ドレスコーディネーターコース】","エアラインワールド","観光ワールド"];
-const SPECIAL_ROOMS=["1Fカフェ","エアラインルーム","ゲストルーム","ゲーミングルーム","ドレスルーム","バンケットルーム","ビューティールーム"];
-const STORE_KEY="thl_kouki_records_v1";
+/* ===== 設定（マスタ）駆動 =====
+   学校名・コース・学年・教室・時限・曜日を編集画面の「設定」から登録し、サーバーに保存する。
+   時間割データはコースの「キー」で保存するため、表示名を後から変えてもデータは作り直し不要。 */
+const GEN=[];  // 前期の初期データは持たない（設定後に編集して作る）
+const PER=[];  // 学生別の初期データも持たない
+function defaultCFG(){return {"schoolName": "東京ホテル・観光＆ホスピタリティ専門学校", "schoolShort": "THL", "gradeCount": 4, "days": ["月", "火", "水", "木", "金"], "periods": [{"n": 1, "start": "09:00", "end": "10:30"}, {"n": 2, "start": "10:40", "end": "12:10"}, {"n": 3, "start": "13:00", "end": "14:30"}, {"n": 4, "start": "14:40", "end": "16:10"}, {"n": 5, "start": "16:20", "end": "17:50"}], "courses": [{"key": "hotel", "short": "ホテル", "full": "ホテルワールド（3年制・4年制）", "color": "#1E5B3C", "urlKey": "hotel", "grades": [1, 2, 3, 4], "fullByGrade": {"1": "ホテルワールド（3年制・4年制）", "2": "ホテルワールド（3年制・4年制）", "3": "ホテルワールド（3年制・4年制）", "4": "ホテルワールド（4年制）"}}, {"key": "tour", "short": "観光", "full": "観光ワールド（4年制）", "color": "#F5C826", "urlKey": "tour", "grades": [1, 2, 3, 4], "fullByGrade": null}, {"key": "air", "short": "エアライン", "full": "エアラインワールド（3年制・4年制）", "color": "#8ED2EC", "urlKey": "air", "grades": [1, 2, 3, 4], "fullByGrade": {"1": "エアラインワールド（3年制・4年制）", "2": "エアラインワールド（3年制・4年制）", "3": "エアラインワールド（4年制）", "4": "エアラインワールド（4年制）"}}, {"key": "dress", "short": "ブライダル(ドレス)", "full": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "color": "#F4B4CC", "urlKey": "dress", "grades": [1, 2, 3], "fullByGrade": null}, {"key": "planner", "short": "ブライダル(プランナー)", "full": "ブライダルワールド【プランナーコース】（3年制）", "color": "#EFA0BE", "urlKey": "planner", "grades": [1, 2, 3], "fullByGrade": null}], "rooms": [{"name": "302", "special": false}, {"name": "303", "special": false}, {"name": "401", "special": false}, {"name": "402", "special": false}, {"name": "403・4", "special": false}, {"name": "501", "special": false}, {"name": "502", "special": false}, {"name": "503", "special": false}, {"name": "504", "special": false}, {"name": "601", "special": false}, {"name": "1Fカフェ", "special": true}, {"name": "エアラインルーム", "special": true}, {"name": "ゲストルーム", "special": true}, {"name": "ゲーミングルーム", "special": true}, {"name": "ドレスルーム", "special": true}, {"name": "バンケットルーム", "special": true}, {"name": "ビューティールーム", "special": true}], "subjects": ["AIリテラシー", "AIリテラシー基礎と生成AIの実践活用", "BIA対策講座（2級）", "BIA対策講座（3級）", "IT基礎知識", "IT基礎知識Ⅰ", "JALキャリアプログラム", "ONSENガストロノミーⅠ", "ONSENガストロノミーⅡ", "SNSプロモーション", "SPI対策", "Self Development", "TOEIC", "WEBデザイン", "※マネジメントゼミ未選択者は、\n「ゲーミング」の選択授業が受講可能です。", "【GSのみ】就職対策基礎", "アルコールの基礎", "アルコールの知識", "イベント企画", "イベント企画Ⅱ", "インバウンドビジネス論", "エアラインマナー", "カメラワーク", "キャリアデザイン", "キャリアプログラム", "キャリアプログラムⅠ", "キャリアプログラムⅡ", "ゲーミング", "コンシェルジュゼミ", "コーヒーの基礎知識", "サービストレーニング", "サービス基礎", "サービス基礎（A）", "サービス基礎（B）", "セルフアップビューティー", "セルフケア", "セルフディスカバリー", "セルフマネジメントⅠ", "セルフメイク", "チームビルディング", "ツアー企画", "テーブルコーディネート", "デジタルマーケティング", "トラベルマーケティング", "ドレススタイリング", "ドレスメンテナンス", "バー・ラウンジサービス", "パーソナルカラー", "ビジネス英会話Ⅱ", "フラワーコーディネート", "ブライダルの演出", "ブライダルビジネスⅠ", "ブライダルビジネスⅠ／映像編集", "ブライダルビジョン", "ブライダルフェア", "ブライダルプランニングⅡ", "ブライダル基礎", "ヘアメイク＆スタイリング", "ホスピタリティコミュニケーション", "ホテルビジネス", "ホテル接客基礎", "ホテル開発演習", "マネジメントゼミ", "マネジメント入門Ⅰ", "ヨガ", "レストランゼミ", "世界遺産観光概論", "中国語", "企業プロジェクト", "会計学", "動画撮影・編集", "卒業研究", "和装着付け実習", "地域コンシェルジュ", "宿泊入門", "就活対策講座", "就職対策Ⅰ", "就職対策Ⅱ", "就職対策Ⅲ", "就職対策Ⅳ", "店舗接客Ⅱ", "店舗接客Ⅲ", "成長学・ストレスマネジメント", "手話", "接客シミュレーション", "旅行業実践学", "日本の伝統文化", "映像編集", "時事研究", "服飾史", "業界研究", "業界研究Ⅲ", "滋慶選択", "異文化交流", "異文化理解", "航空業界基礎知識", "航空知識Ⅰ", "航空知識Ⅱ", "航空知識Ⅲ", "英会話Ⅰ", "英会話Ⅲ", "表現力コミュニケーション", "観光イベントプランニング", "観光概論", "観光概論基礎Ⅰ", "観光資源Ⅰ", "韓国語", "音響・音楽"], "teachers": ["ILC", "Saori", "上山 翔太郎", "上山翔太郎", "下辻 久子", "中野 智", "亀山 和也", "井上 勝馬", "佐藤 玲子", "倉持 健史", "八芳園", "内藤 法子", "北村 広一", "名鉄観光", "城 万紀子", "塩家 吹雪", "宮崎 辰", "富永 誠", "寺迫 寛子", "小倉 一夫", "小倉 通孝", "小池 美穂", "山本 美穂", "岡本 真理", "岡村 奈奈", "岡野 朋一", "市川 大地", "平地 和恵", "平岡 里実", "弓野 克彦", "担任", "日本航空", "早坂 英里", "星 麻美", "曽根 美恵", "服部 陵子", "本田 名智", "栗原 幸代", "櫻井 まどか", "武田 絢子", "津本 さおり", "渡辺 亜希子", "渡邊 昌恵", "溝田 祐一郎", "田村 勇樹", "田村 勇樹 ", "田隝 益美", "矢島 慶佑", "石原 健", "石垣 利恵", "神崎 公一", "竹内 秀次郎", "遠矢 浩和", "遠藤 孝博", "長木 利通", "関本 利恵", "関本 理恵", "青木 思生", "高見澤 肇", "髙島 良宏", "黒田 尚嗣"], "termNames": {"early": "前期", "late": "後期"}, "configured": true};}
+let CFG=defaultCFG();
+/* 既存コードが参照する変数群。CFGから毎回組み立てる（識別子は従来のまま） */
+let OPT={subjects:[],teachers:[],rooms:[],rooms_clean:[],world_by_grade:{}};
+let ROOMS=[],SPECIAL_ROOMS=[],DAYS=[],PERIODS=[],WORLD_ORDER=[];
+let PTIME={},PTIME_FULL={},PRANGE={},WORLD_URL_KEYS={};
+const FW={"0":"０","1":"１","2":"２","3":"３","4":"４","5":"５","6":"６","7":"７","8":"８","9":"９",":":"："};
+function toFW(s){return String(s||"").split("").map(ch=>FW[ch]||ch).join("");}
+/* 時刻の表示用（先頭の0は落として「９：００」の形にする） */
+function fmtTime(hm){return toFW(String(hm||"").replace(/^0/,""));}
+function toMin(hm){const m=/^(\d{1,2}):(\d{2})$/.exec(String(hm||""));return m?(+m[1])*60+(+m[2]):0;}
+function courseByKey(k){return (CFG.courses||[]).find(c=>c.key===k)||null;}
+function courseOf(v){ // キー・正式名・表示名のいずれからでもコースを引く
+  if(!v)return null;const s=String(v);
+  return (CFG.courses||[]).find(c=>c.key===s||c.full===s||c.short===s||
+    (c.fullByGrade&&Object.keys(c.fullByGrade).some(g=>c.fullByGrade[g]===s)))||null;}
+function gradeList(){const n=Math.max(1,Math.min(6,+CFG.gradeCount||4));
+  return Array.from({length:n},(_,i)=>i+1);}
+function applyCFG(){
+  DAYS=(CFG.days||[]).slice();
+  const ps=(CFG.periods||[]).slice().sort((a,b)=>a.n-b.n);
+  PERIODS=ps.map(p=>p.n);
+  PTIME={};PTIME_FULL={};PRANGE={};
+  ps.forEach(p=>{PTIME[p.n]=fmtTime(p.start)+"〜";
+    PTIME_FULL[p.n]=fmtTime(p.start)+"〜"+fmtTime(p.end);
+    PRANGE[p.n]=[toMin(p.start),toMin(p.end)];});
+  ROOMS=(CFG.rooms||[]).map(r=>r.name);
+  SPECIAL_ROOMS=(CFG.rooms||[]).filter(r=>r.special).map(r=>r.name);
+  WORLD_ORDER=(CFG.courses||[]).map(c=>c.full||c.short);
+  WORLD_URL_KEYS={};(CFG.courses||[]).forEach(c=>{if(c.urlKey)WORLD_URL_KEYS[c.urlKey]=c.short;});
+  const wbg={};gradeList().forEach(g=>{
+    wbg[String(g)]=(CFG.courses||[]).filter(c=>(c.grades||[]).indexOf(g)!==-1)
+      .map(c=>(c.fullByGrade&&c.fullByGrade[String(g)])||c.full||c.short);});
+  // OPT.subjects などは他所で参照を保持しているため、配列の中身だけを入れ替える
+  const setArr=(a,v)=>{a.length=0;(v||[]).forEach(x=>a.push(x));};
+  setArr(OPT.subjects,CFG.subjects);setArr(OPT.teachers,CFG.teachers);
+  setArr(OPT.rooms,ROOMS);setArr(OPT.rooms_clean,ROOMS);
+  OPT.world_by_grade=wbg;
+  applyCourseColors();
+  NOW=nowInfo();
+}
+/* コース色は数が可変なので、設定内容からCSSを生成して差し込む */
+function applyCourseColors(){
+  let el=document.getElementById("courseColorCSS");
+  if(!el){el=document.createElement("style");el.id="courseColorCSS";document.head.appendChild(el);}
+  el.textContent=(CFG.courses||[]).map(c=>{
+    const t=courseTheme(c.color);
+    return `table.week.w-${c.key} thead th{background:${t.head};color:${t.headText}}`+
+      `table.week.w-${c.key} thead th.corner{background:${t.corner}}`+
+      `table.week.w-${c.key} td.period-cell{background:${t.side};color:${t.sideText}}`+
+      `table.week.w-${c.key} td.period-cell .ptime{color:${t.sideSub}}`;
+  }).join("\n");
+}
+/* 基準色から、見出し(濃)・時限列(淡)・文字色を自動生成。明るい色は濃い文字にして可読性を保つ */
+function courseTheme(hex){
+  const h=(hex||"#0b6e8f").replace("#","");
+  const r=parseInt(h.substr(0,2),16),g=parseInt(h.substr(2,2),16),b=parseInt(h.substr(4,2),16);
+  const lum=(0.299*r+0.587*g+0.114*b)/255;           // 明るさ
+  const mix=(x,y,t)=>Math.round(x+(y-x)*t);
+  const hx=(x)=>("0"+Math.max(0,Math.min(255,x)).toString(16)).slice(-2);
+  const dark=`#${hx(mix(r,0,.45))}${hx(mix(g,0,.45))}${hx(mix(b,0,.45))}`;
+  const deep=`#${hx(mix(r,0,.62))}${hx(mix(g,0,.62))}${hx(mix(b,0,.62))}`;
+  const pale=`#${hx(mix(r,255,.86))}${hx(mix(g,255,.86))}${hx(mix(b,255,.86))}`;
+  const mid=`#${hx(mix(r,0,.25))}${hx(mix(g,0,.25))}${hx(mix(b,0,.25))}`;
+  return lum>0.62
+    ? {head:`#${h}`,headText:deep,corner:dark,side:pale,sideText:deep,sideSub:mid}
+    : {head:`#${h}`,headText:"#ffffff",corner:dark,side:pale,sideText:deep,sideSub:mid};
+}
+/* 学期の呼び方（設定で変更できる） */
+/* ファイル名に使う学校名（記号は除く。未設定なら空） */
+function brandFile(){return String(CFG.schoolShort||CFG.schoolName||"").replace(/[\\/:*?"<>|\s]/g,"");}
+function termLabel(t){const n=(CFG&&CFG.termNames)||{};return t==="late"?(n.late||"後期"):(n.early||"前期");}
+/* 学校名をヘッダー・タイトルに反映 */
+function applyBranding(){
+  const nm=(CFG.schoolShort||CFG.schoolName||"").trim();
+  const base=(nm?nm+" ":"")+"時間割";
+  const h1=document.querySelector("#appHeader h1");
+  if(h1)h1.textContent=VIEWER_MODE?(base+"（閲覧版）"):(base+"ツール");
+  const te=document.getElementById("termEarly"),tl=document.getElementById("termLate");
+  if(te)te.textContent=termLabel("early");
+  if(tl)tl.textContent=termLabel("late");
+  const gt=document.getElementById("gateTitle");if(gt)gt.textContent=base+"ツール";
+  const lt=document.getElementById("lockTitle");if(lt)lt.innerHTML=esc(base)+"ツール<span>編集画面</span>";
+  const yb=document.getElementById("ynBadge");if(yb)yb.textContent=(CFG.schoolShort||"SCHEDULE");
+  try{document.title=base+"ツール"+(schoolYear?(" — "+schoolYear+"年度"):"");}catch(e){document.title=base+"ツール";}
+}
+/* 設定が変わったら、画面の各チップ・候補を組み立て直す */
+function rebuildFromCFG(){
+  try{buildClassChips();}catch(e){}
+  try{buildFreeChips();}catch(e){}
+  try{buildSlotChips();}catch(e){}
+  try{rebuildWorldChips();}catch(e){}
+  try{rebuildRoomPick();}catch(e){}
+  try{rebuildPersonPick();}catch(e){}
+  applyViewerSelection();
+}
+/* コースURL（?w=）を、設定が届いてから表示名に解決して選択状態にする */
+function applyViewerSelection(){
+  if(!VIEWER_MODE||!VIEWER_WORLD)return;
+  const c=courseOf(VIEWER_WORLD);
+  const short=WORLD_URL_KEYS[VIEWER_WORLD]||(c?c.short:VIEWER_WORLD);
+  cstate.world=short;
+  if(VIEWER_GRADE)cstate.grade=VIEWER_GRADE;
+  try{rebuildWorldChips();refreshChips("#classPanel",cstate);}catch(e){}
+}
+/* ===================== 設定（マスタ）画面 ===================== */
+let CFGD=null;               // 編集中の下書き
+const DAY_ALL=["月","火","水","木","金","土","日"];
+function cfgStartDraft(){
+  CFGD=JSON.parse(JSON.stringify(CFG));
+  const d=defaultCFG();
+  if(!CFGD.periods||!CFGD.periods.length)CFGD.periods=d.periods;
+  if(!CFGD.days||!CFGD.days.length)CFGD.days=d.days;
+  if(!CFGD.courses)CFGD.courses=[];
+  if(!CFGD.rooms)CFGD.rooms=[];
+  if(!CFGD.termNames)CFGD.termNames={early:"前期",late:"後期"};
+}
+function cfgHostId(){
+  return document.getElementById("setupWizard").classList.contains("show")?"setupBody":"cfgBody";
+}
+function newCourseKey(){
+  let i=1;while((CFGD.courses||[]).some(c=>c.key==="c"+i))i++;return "c"+i;
+}
+const CFG_PALETTE=["#1E5B3C","#C9A227","#3B9CC2","#D9548E","#7A4EA8","#0B6E8F","#B4552A","#4A7C3F"];
+/* ===== 設定画面：左メニュー＋作業ペイン ===== */
+const CFG_SECS=[
+  {id:"school", label:"学校名"},
+  {id:"grade",  label:"学年・学期"},
+  {id:"days",   label:"曜日"},
+  {id:"periods",label:"時限"},
+  {id:"courses",label:"コース"},
+  {id:"rooms",  label:"教室"},
+  {id:"opts",   label:"入力候補"},
+];
+let CFG_SEC="school";      // 表示中のセクション
+let CFG_DIRTY={};          // 変更のあったセクション（保存忘れ防止の印）
+function cfgMark(sec){CFG_DIRTY[sec||CFG_SEC]=true;}
+/* コース・教室が実際に使われている件数（削除時の影響確認に使う） */
+function courseUseCount(key){
+  return [...(lateRecords||[]),...(earlyRecords||[])].filter(r=>String(r.world)===key).length;
+}
+function roomUseCount(name){
+  if(!name)return 0;
+  return [...(lateRecords||[]),...(earlyRecords||[]),...(lateP||[])]
+    .filter(r=>normRooms(r.room||"").indexOf(name)!==-1).length;
+}
+/* 表示中のセクションだけ DOM → 下書き に取り込む */
+function cfgReadCurrent(){
+  const v=id=>{const e=document.getElementById(id);return e?e.value:"";};
+  const has=id=>!!document.getElementById(id);
+  if(CFG_SEC==="school"&&has("cfgSchoolName")){
+    CFGD.schoolName=v("cfgSchoolName").trim();
+    CFGD.schoolShort=v("cfgSchoolShort").trim();
+  }
+  if(CFG_SEC==="grade"&&has("cfgGradeCount")){
+    CFGD.gradeCount=+v("cfgGradeCount")||4;
+    CFGD.termNames={early:v("cfgTermEarly").trim()||"前期",late:v("cfgTermLate").trim()||"後期"};
+  }
+  if(CFG_SEC==="days"&&document.querySelector('.cfg-tg[data-day]')){
+    CFGD.days=DAY_ALL.filter(d=>{const e=document.querySelector('.cfg-tg[data-day="'+d+'"]');return e&&e.classList.contains("on");});
+  }
+  if(CFG_SEC==="periods"&&document.querySelector("#cfgPeriods tr[data-i]")){
+    CFGD.periods=[...document.querySelectorAll("#cfgPeriods tr[data-i]")].map((row,i)=>({
+      n:i+1,start:row.querySelector(".p-start").value||"09:00",end:row.querySelector(".p-end").value||"10:30"}));
+  }
+  if(CFG_SEC==="courses"&&document.querySelector("#cfgCourses .ccard")){
+    CFGD.courses=[...document.querySelectorAll("#cfgCourses .ccard")].map(card=>{
+      const k=card.dataset.key;
+      const grades=[...card.querySelectorAll(".c-grade.on")].map(x=>+x.dataset.g);
+      const fullV=card.querySelector(".c-full").value.trim();
+      let fbg=null;
+      if(card.querySelector(".c-fbg.on")){
+        fbg={};[...card.querySelectorAll(".c-fbg-in")].forEach(inp=>{
+          const v2=inp.value.trim();if(v2)fbg[inp.dataset.g]=v2;});
+        grades.forEach(g=>{if(!fbg[String(g)])fbg[String(g)]=fullV;});
+      }
+      return {key:k,
+        short:card.querySelector(".c-short").value.trim(),
+        full:fullV,
+        color:card.querySelector(".c-color").value,
+        urlKey:card.querySelector(".c-url").value.trim(),
+        fullByGrade:fbg,
+        grades:grades};
+    });
+  }
+  if(CFG_SEC==="opts"&&has("cfgSubjects")){
+    CFGD.subjects=v("cfgSubjects").split("\n").map(x=>x.trim()).filter(Boolean);
+    CFGD.teachers=v("cfgTeachers").split("\n").map(x=>x.trim()).filter(Boolean);
+  }
+  // 教室（rooms）はタグ操作でその都度 CFGD を直接更新しているため、ここでは読み取らない
+}
+/* 左メニューの要約文 */
+function cfgSummary(id){
+  switch(id){
+    case "school":  return (CFGD.schoolShort||CFGD.schoolName)?"設定済":"未";
+    case "grade":   return (CFGD.gradeCount||4)+"学年";
+    case "days":    return (CFGD.days||[]).length+"日";
+    case "periods": return (CFGD.periods||[]).length+"限";
+    case "courses": return (CFGD.courses||[]).length+"件";
+    case "rooms":   return (CFGD.rooms||[]).length+"室";
+    case "opts":    return ((CFGD.subjects||[]).length+(CFGD.teachers||[]).length)+"件";
+  }
+  return "";
+}
+function renderCfg(){
+  const host=document.getElementById(cfgHostId());
+  if(!host)return;
+  const setup=(cfgHostId()==="setupBody");
+  const dirtyCount=Object.keys(CFG_DIRTY).length;
+  host.innerHTML=
+    '<div class="cfg-shell">'+
+      '<nav class="cfg-nav">'+CFG_SECS.map(sc=>
+        `<button data-sec="${sc.id}" class="${sc.id===CFG_SEC?"on":""}${CFG_DIRTY[sc.id]?" dirty":""}">`+
+        `<span class="nv-dot"></span>${sc.label}<span class="nv-sum">${esc(cfgSummary(sc.id))}</span></button>`).join("")+
+      '</nav>'+
+      '<div id="cfgPane">'+cfgSectionHTML()+'</div>'+
+      '<div class="cfg-save">'+
+        `<button class="btn edit" id="cfgSave">${setup?"この内容で始める":"設定を保存"}</button>`+
+        (setup?"":'<button class="btn ghost" id="cfgReset">編集を取り消す</button>')+
+        '<button class="btn ghost" id="cfgExport">設定を書き出す</button>'+
+        '<button class="btn ghost" id="cfgImport">設定を読み込む</button>'+
+        (dirtyCount?`<span class="cfg-dirtynote">● 未保存の変更が ${dirtyCount} 箇所あります</span>`:"")+
+        '<span class="cfg-err" id="cfgErr"></span>'+
+      '</div>'+
+    '</div>';
+  bindCfg();
+}
+/* セクションだけを描き直す（メニューの要約・印も更新） */
+function renderCfgPane(){renderCfg();}
+function cfgSectionHTML(){
+  const e2=x=>esc(x==null?"":String(x));
+  const gl=Array.from({length:Math.max(1,Math.min(6,+CFGD.gradeCount||4))},(_,i)=>i+1);
+  const card=(title,desc,body)=>`<div class="fcard"><div class="fcard-t">${title}</div>`+
+    (desc?`<div class="fcard-d">${desc}</div>`:"")+body+`</div>`;
+
+  if(CFG_SEC==="school")return card("学校名",
+    "画面の見出しや印刷、書き出すファイル名に使われます。略称は画面上部に表示されます。",
+    `<div class="ff"><label>正式名称</label><input type="text" id="cfgSchoolName" value="${e2(CFGD.schoolName)}" placeholder="例：○○専門学校"></div>
+     <div class="ff"><label>略称（画面表示用）</label><input type="text" id="cfgSchoolShort" value="${e2(CFGD.schoolShort)}" placeholder="例：○○"></div>`);
+
+  if(CFG_SEC==="grade")return card("学年・学期",
+    "学年の数と、学期の呼び方を決めます。学期名は画面の切り替えボタンと印刷の見出しに使われます。",
+    `<div class="ff"><label>学年の数</label><select id="cfgGradeCount">${[1,2,3,4,5,6].map(n=>`<option value="${n}"${(+CFGD.gradeCount||4)===n?" selected":""}>1年〜${n}年（${n}学年）</option>`).join("")}</select></div>
+     <div class="ff-row">
+       <div class="ff"><label>前半の学期名</label><input type="text" id="cfgTermEarly" value="${e2(CFGD.termNames.early)}" placeholder="前期"></div>
+       <div class="ff"><label>後半の学期名</label><input type="text" id="cfgTermLate" value="${e2(CFGD.termNames.late)}" placeholder="後期"></div>
+     </div>`);
+
+  if(CFG_SEC==="days")return card("授業のある曜日",
+    "クリックで選び／解除します。選んだ曜日が時間割の表に並びます。",
+    `<div class="cfg-toggles">${DAY_ALL.map(d=>`<div class="cfg-tg${(CFGD.days||[]).indexOf(d)!==-1?" on":""}" data-day="${d}">${d}</div>`).join("")}</div>`);
+
+  if(CFG_SEC==="periods")return card("時限と時刻",
+    "上から順に1限・2限…になります。矢印で並び替えると番号は振り直されます。時刻は表と印刷に表示されます。",
+    `<table class="cfg-ptable" id="cfgPeriods">
+      <thead><tr><th style="width:58px">時限</th><th>開始</th><th>終了</th><th style="width:104px"></th></tr></thead>
+      <tbody>${(CFGD.periods||[]).map((p,i)=>`
+        <tr data-i="${i}">
+          <td class="pn">${i+1}限</td>
+          <td><input type="time" class="p-start" value="${e2(p.start)}"></td>
+          <td><input type="time" class="p-end" value="${e2(p.end)}"></td>
+          <td style="text-align:right;white-space:nowrap">
+            <button class="iconbtn" data-mv="period" data-i="${i}" data-d="-1" title="上へ">▲</button>
+            <button class="iconbtn" data-mv="period" data-i="${i}" data-d="1" title="下へ">▼</button>
+            <button class="iconbtn dg" data-del="period" data-i="${i}" title="削除">✕</button>
+          </td>
+        </tr>`).join("")}</tbody>
+     </table>
+     <button class="cfg-add" data-add="period">＋　時限を追加</button>`);
+
+  if(CFG_SEC==="courses"){
+    const cards=(CFGD.courses||[]).map((c,i)=>{
+      const t=courseTheme(c.color),used=courseUseCount(c.key);
+      return `
+      <div class="ccard" data-key="${e2(c.key)}">
+        <div class="ccard-head" style="background:${t.head};color:${t.headText}">
+          <span class="ch-name">${e2(c.short||"（名称未設定）")}</span>
+          ${used?`<span class="ch-cnt">授業 ${used}件</span>`:""}
+          <button class="iconbtn" data-mv="course" data-i="${i}" data-d="-1" title="上へ">▲</button>
+          <button class="iconbtn" data-mv="course" data-i="${i}" data-d="1" title="下へ">▼</button>
+          <button class="iconbtn" data-del="course" data-key="${e2(c.key)}" title="削除">✕</button>
+        </div>
+        <div class="ccard-body">
+          <div class="ff-row">
+            <div class="ff"><label>表示名（短い名前）</label><input type="text" class="c-short" value="${e2(c.short)}" placeholder="例：ホテル"></div>
+            <div class="ff"><label>正式名称（印刷用）</label><input type="text" class="c-full" value="${e2(c.full)}" placeholder="例：ホテル学科（3年制）"></div>
+          </div>
+          <div class="ff-row">
+            <div class="ff"><label>色</label>
+              <div class="swatch"><input type="color" class="c-color" value="${e2(c.color||"#0B6E8F")}"><span>${e2((c.color||"#0B6E8F").toUpperCase())}</span></div>
+            </div>
+            <div class="ff"><label>URLキー（配布リンク用）</label><input type="text" class="c-url" value="${e2(c.urlKey||"")}" placeholder="hotel"></div>
+          </div>
+          <div class="ff"><label>対象の学年</label>
+            <div class="cfg-toggles">${gl.map(g=>`<div class="cfg-tg c-grade${(c.grades||[]).indexOf(g)!==-1?" on":""}" data-g="${g}">${g}年</div>`).join("")}</div>
+          </div>
+          <div class="ff">
+            <div class="cfg-toggles"><span class="cfg-tg c-fbg${c.fullByGrade?" on":""}" data-fbg="${e2(c.key)}" style="padding:5px 12px;font-size:.78rem">学年ごとに正式名称を分ける</span></div>
+            ${c.fullByGrade?`<div style="margin-top:12px">${(c.grades||[]).map(g=>`
+              <div class="ff" style="margin-bottom:10px"><label>${g}年の正式名称</label>
+                <input type="text" class="c-fbg-in" data-g="${g}" value="${e2(c.fullByGrade[String(g)]||c.full||"")}" placeholder="${e2(c.full||"○○学科")}"></div>`).join("")}</div>`:""}
+          </div>
+          <div class="ff" style="margin-bottom:0"><label>時間割の見出しプレビュー</label>
+            <div class="cfg-prev">
+              <div class="pv-h" style="background:${t.head};color:${t.headText}">
+                <div class="pv-corner" style="background:${t.corner}">時限</div>${(CFGD.days||["月","火","水"]).slice(0,5).map(d=>`<div>${d}</div>`).join("")}
+              </div>
+              <div class="pv-b"><div class="pv-side" style="background:${t.side};color:${t.sideText}">1限</div>
+                <div class="pv-cell">授業のマスはこの見え方になります</div></div>
+            </div>
+          </div>
+        </div>
+      </div>`;}).join("");
+    return card("コース（学科・専攻）",
+      "時間割を分ける単位です。色を選ぶと、プレビューで見出しの見え方をその場で確認できます。並び順は画面のボタンの並びに反映されます。",
+      `<div id="cfgCourses">${cards||'<div class="fcard-d" style="margin:0">まだコースがありません。下のボタンから追加してください。</div>'}</div>
+       <button class="cfg-add" data-add="course">＋　コースを追加</button>`);
+  }
+
+  if(CFG_SEC==="rooms")return card("教室",
+    "教室名を入力して Enter で追加します（カンマ区切りでまとめて追加もできます）。「特」で特別教室に切り替わり、空き教室の一覧で分けて表示されます。",
+    `<div class="chipbox" id="cfgRooms">
+      ${(CFGD.rooms||[]).map((r,i)=>{const n=roomUseCount(r.name);return `
+        <span class="rchip${r.special?" sp":""}" data-i="${i}">
+          <span class="rc-mv" data-mv="room" data-i="${i}" data-d="-1" title="前へ">◀</span>
+          ${e2(r.name)}${n?`<span class="rc-n">${n}</span>`:""}
+          <span class="rc-sp" data-sp="${i}" title="特別教室の切り替え">特</span>
+          <span class="rc-mv" data-mv="room" data-i="${i}" data-d="1" title="次へ">▶</span>
+          <span class="rc-x" data-del="room" data-i="${i}" title="削除">×</span>
+        </span>`;}).join("")}
+      <input type="text" id="cfgRoomInput" placeholder="教室名を入力して Enter">
+     </div>`);
+
+  if(CFG_SEC==="opts")return card("入力候補",
+    "授業を登録するときに候補として表示されます。1行に1つ書いてください。空のままでも構いません（あとから足せます）。",
+    `<div class="ff-row">
+      <div class="ff"><label>科目名</label><textarea id="cfgSubjects" placeholder="英会話&#10;サービス基礎">${e2((CFGD.subjects||[]).join("\n"))}</textarea></div>
+      <div class="ff"><label>講師名</label><textarea id="cfgTeachers" placeholder="山田 太郎&#10;佐藤 花子">${e2((CFGD.teachers||[]).join("\n"))}</textarea></div>
+     </div>`);
+  return "";
+}
+function cfgMove(arr,i,d){
+  const j=i+d;if(j<0||j>=arr.length)return false;
+  const t=arr[i];arr[i]=arr[j];arr[j]=t;return true;
+}
+function bindCfg(){
+  const host=document.getElementById(cfgHostId());
+  // 左メニュー
+  host.querySelectorAll(".cfg-nav button").forEach(b=>b.onclick=()=>{
+    cfgReadCurrent();CFG_SEC=b.dataset.sec;renderCfg();});
+  // トグル類
+  host.querySelectorAll(".cfg-tg[data-day]").forEach(e=>e.onclick=()=>{e.classList.toggle("on");cfgMark("days");
+    cfgReadCurrent();renderCfg();});
+  host.querySelectorAll(".cfg-tg.c-grade").forEach(e=>e.onclick=()=>{
+    e.classList.toggle("on");cfgMark("courses");cfgReadCurrent();renderCfg();});
+  host.querySelectorAll(".cfg-tg.c-fbg").forEach(e=>e.onclick=()=>{
+    cfgReadCurrent();
+    const c=CFGD.courses.find(x=>x.key===e.dataset.fbg);
+    if(c){
+      if(c.fullByGrade)c.fullByGrade=null;
+      else{c.fullByGrade={};(c.grades||[]).forEach(g=>c.fullByGrade[String(g)]=c.full||c.short);}
+    }
+    cfgMark("courses");renderCfg();});
+  // 入力の変更で印を付ける
+  host.querySelectorAll("input,select,textarea").forEach(e=>{
+    e.addEventListener("input",()=>cfgMark());
+    if(e.classList.contains("c-color"))e.addEventListener("change",()=>{cfgReadCurrent();cfgMark("courses");renderCfg();});
+    if(e.classList.contains("c-short"))e.addEventListener("change",()=>{cfgReadCurrent();renderCfg();});
+  });
+  // 追加
+  host.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>{
+    cfgReadCurrent();
+    const t=b.dataset.add;
+    if(t==="period"){const last=CFGD.periods[CFGD.periods.length-1];
+      CFGD.periods.push({n:CFGD.periods.length+1,start:last?last.end:"09:00",end:last?last.end:"10:30"});cfgMark("periods");}
+    if(t==="course"){CFGD.courses.push({key:newCourseKey(),short:"",full:"",
+      color:CFG_PALETTE[CFGD.courses.length%CFG_PALETTE.length],urlKey:"",grades:[]});cfgMark("courses");}
+    renderCfg();});
+  // 並び替え
+  host.querySelectorAll("[data-mv]").forEach(b=>b.onclick=()=>{
+    cfgReadCurrent();
+    const t=b.dataset.mv,i=+b.dataset.i,d=+b.dataset.d;
+    if(t==="period"&&cfgMove(CFGD.periods,i,d)){CFGD.periods.forEach((p,k)=>p.n=k+1);cfgMark("periods");}
+    if(t==="course"&&cfgMove(CFGD.courses,i,d))cfgMark("courses");
+    if(t==="room"&&cfgMove(CFGD.rooms,i,d))cfgMark("rooms");
+    renderCfg();});
+  // 削除（影響件数を出して確認）
+  host.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{
+    cfgReadCurrent();
+    const t=b.dataset.del;
+    if(t==="period"){
+      if(CFGD.periods.length<=1){alert("時限は1つ以上必要です。");return;}
+      CFGD.periods.splice(+b.dataset.i,1);CFGD.periods.forEach((p,k)=>p.n=k+1);cfgMark("periods");
+    }
+    if(t==="room"){
+      const r=CFGD.rooms[+b.dataset.i];const used=r?roomUseCount(r.name):0;
+      if(used&&!confirm(`「${r.name}」は ${used}件の授業で使われています。\n削除しても授業側の教室名は残りますが、空き教室の判定から外れます。削除しますか？`))return;
+      CFGD.rooms.splice(+b.dataset.i,1);cfgMark("rooms");
+    }
+    if(t==="course"){
+      const k=b.dataset.key,c=CFGD.courses.find(x=>x.key===k);const used=courseUseCount(k);
+      if(used&&!confirm(`「${c&&c.short||"このコース"}」には ${used}件の授業が登録されています。\n削除すると、その授業は画面に表示されなくなります。よろしいですか？`))return;
+      CFGD.courses=CFGD.courses.filter(x=>x.key!==k);cfgMark("courses");
+    }
+    renderCfg();});
+  // 教室：タグ入力
+  const ri=document.getElementById("cfgRoomInput");
+  if(ri){
+    ri.onkeydown=(ev)=>{
+      if(ev.key==="Enter"){
+        ev.preventDefault();
+        const names=ri.value.split(/[,、\s]+/).map(x=>x.trim()).filter(Boolean);
+        if(!names.length)return;
+        names.forEach(nm=>{if(!CFGD.rooms.some(r=>r.name===nm))CFGD.rooms.push({name:nm,special:false});});
+        ri.value="";cfgMark("rooms");renderCfg();
+        const n=document.getElementById("cfgRoomInput");if(n)n.focus();
+      }else if(ev.key==="Backspace"&&!ri.value&&CFGD.rooms.length){
+        CFGD.rooms.pop();cfgMark("rooms");renderCfg();
+        const n=document.getElementById("cfgRoomInput");if(n)n.focus();
+      }};
+  }
+  host.querySelectorAll("[data-sp]").forEach(e=>e.onclick=()=>{
+    const i=+e.dataset.sp;CFGD.rooms[i].special=!CFGD.rooms[i].special;cfgMark("rooms");renderCfg();});
+  // 保存・取り消し
+  const ex=document.getElementById("cfgExport");if(ex)ex.onclick=exportCfg;
+  const im=document.getElementById("cfgImport");if(im)im.onclick=importCfg;
+  const sv=document.getElementById("cfgSave");if(sv)sv.onclick=saveCfg;
+  const rs=document.getElementById("cfgReset");if(rs)rs.onclick=()=>{
+    if(Object.keys(CFG_DIRTY).length&&!confirm("編集中の変更を取り消して、保存済みの内容に戻します。よろしいですか？"))return;
+    cfgStartDraft();CFG_DIRTY={};renderCfg();};
+}
+
+function saveCfg(){
+  cfgReadCurrent();
+  const err=[];
+  if(!CFGD.schoolName&&!CFGD.schoolShort)err.push("学校の名前を入力してください。");
+  if(!CFGD.days.length)err.push("授業のある曜日を1つ以上選んでください。");
+  if(!CFGD.periods.length)err.push("時限を1つ以上登録してください。");
+  const cs=CFGD.courses.filter(c=>c.short);
+  if(!cs.length)err.push("コースを1つ以上登録してください（表示名が必要です）。");
+  if(cs.some(c=>!(c.grades||[]).length))err.push("各コースの対象の学年を1つ以上選んでください。");
+  const shorts=cs.map(c=>c.short);
+  if(new Set(shorts).size!==shorts.length)err.push("コースの表示名が重複しています。");
+  const rooms=CFGD.rooms.filter(r=>r.name);
+  if(!rooms.length)err.push("教室を1つ以上登録してください。");
+  const e=document.getElementById("cfgErr");
+  if(err.length){if(e)e.textContent=err[0];alert(err.join("\n"));return;}
+  if(e)e.textContent="";
+  // 整える
+  CFGD.courses=cs.map(c=>({key:c.key,short:c.short,full:c.full||c.short,
+    color:c.color||"#0B6E8F",urlKey:(c.urlKey||c.key).replace(/[^A-Za-z0-9_-]/g,"")||c.key,grades:c.grades}));
+  CFGD.rooms=rooms;
+  CFGD.configured=true;
+  CFG_DIRTY={};   // 保存できたので未保存マークを消す
+  CFG=JSON.parse(JSON.stringify(CFGD));
+  applyCFG();applyBranding();rebuildFromCFG();
+  try{saveCfgLocal();}catch(e2){}
+  try{schedulePush();}catch(e2){}
+  document.getElementById("setupWizard").classList.remove("show");
+  try{renderAll();}catch(e2){}
+  try{if(document.getElementById("configView").style.display!=="none")renderCfg();}catch(e2){}
+  setSaved("設定を保存しました "+new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}));
+  alert("設定を保存しました。");
+}
+/* 設定のバックアップ・移行用 */
+function exportCfg(){
+  cfgReadCurrent();
+  const blob=new Blob([JSON.stringify(CFGD,null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);
+  a.download="時間割ツール設定_"+(CFGD.schoolShort||CFGD.schoolName||"設定")+".json";a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+function importCfg(){
+  const inp=document.createElement("input");inp.type="file";inp.accept=".json,application/json";
+  inp.onchange=()=>{const f=inp.files&&inp.files[0];if(!f)return;
+    const r=new FileReader();
+    r.onload=()=>{try{
+      const d=JSON.parse(r.result);
+      if(!d||typeof d!=="object"||!Array.isArray(d.courses))throw new Error("形式が違います");
+      if(!confirm("設定ファイルを読み込みます。編集中の内容は置き換わります。よろしいですか？"))return;
+      CFGD=Object.assign(defaultCFG(),d);
+      CFG_SEC="school";cfgMark("school");renderCfg();
+      alert("設定を読み込みました。内容を確認して「設定を保存」を押してください。");
+    }catch(e){alert("設定ファイルを読み込めませんでした。\n"+(e&&e.message||""));}};
+    r.readAsText(f,"utf-8");};
+  inp.click();
+}
+const CFG_STORE="tt_config_v1";
+function saveCfgLocal(){try{localStorage.setItem(CFG_STORE,JSON.stringify(CFG));}catch(e){}}
+function loadCfgLocal(){try{const t=localStorage.getItem(CFG_STORE);if(t)CFG=Object.assign(defaultCFG(),JSON.parse(t));}catch(e){}}
+/* 未設定なら、編集画面でセットアップを開く */
+function openSetupIfNeeded(){
+  if(VIEWER_MODE)return false;
+  if(CFG.configured)return false;
+  cfgStartDraft();CFG_DIRTY={};CFG_SEC="school";
+  document.getElementById("setupWizard").classList.add("show");
+  renderCfg();
+  return true;
+}
+function openConfigTab(){
+  cfgStartDraft();CFG_DIRTY={};CFG_SEC="school";renderCfg();
+}
+/* 設定タブは編集画面のみ。閲覧画面では出さない */
+function setupTabVisibility(){
+  const t=document.getElementById("tabConfig");
+  if(t)t.style.display=VIEWER_MODE?"none":"";
+}
+/* 閲覧画面で、まだ設定が済んでいないときの案内 */
+function showNotConfiguredNotice(){
+  let el=document.getElementById("yearNotice");
+  if(!el){el=document.createElement("div");el.id="yearNotice";
+    el.innerHTML='<div class="yn-card"><div class="yn-badge">SETUP</div>'+
+      '<div class="yn-title">準備中です</div><div class="yn-msg" id="ynMsg"></div>'+
+      '<div class="yn-sub"></div></div>';
+    document.body.appendChild(el);}
+  document.getElementById("ynMsg").innerHTML="このツールはまだ設定が済んでいません。<br>担当の方が設定を登録すると表示されます。";
+  el.querySelector(".yn-sub").textContent="";
+  el.style.display="flex";
+  Array.prototype.forEach.call(document.body.children,function(ch){if(ch.id!=="yearNotice")ch.style.display="none";});
+}
+const STORE_KEY="tt_kouki_records_v1";
 
 // ===== 状態 =====
 let term="early"; // early=前期, late=後期
@@ -785,12 +1448,12 @@ function updateIntegBadge(){
 
 // 前期の編集差分（元データGENは保持し、差分だけ別保存していつでも戻せる）
 // edits[key] = {type:"edit"|"delete", data:{...}} ／ key = grade|world|day|period
-const STORE_EEDIT="thl_zenki_edits_v1";
+const STORE_EEDIT="tt_zenki_edits_v1";
 let earlyRecords=[];        // 前期クラス時間割（初回はGENから生成、以降は直接編集）
 let earlyEdits={};          // 後方互換（旧データ移行用。現在は未使用）
 function loadEarlyEdits(){
   try{
-    const sNew=localStorage.getItem("thl_zenki_records_v1");
+    const sNew=localStorage.getItem("tt_zenki_records_v1");
     if(sNew){earlyRecords=JSON.parse(sNew);return;}
   }catch(e){}
   try{const s=localStorage.getItem(STORE_EEDIT);if(s)earlyEdits=JSON.parse(s);}catch(e){earlyEdits={};}
@@ -813,7 +1476,7 @@ function buildEarlyFromGen(){
   });
   return out;
 }
-function saveEarlyEdits(){try{localStorage.setItem("thl_zenki_records_v1",JSON.stringify(earlyRecords));
+function saveEarlyEdits(){try{localStorage.setItem("tt_zenki_records_v1",JSON.stringify(earlyRecords));
   setSaved("前期 保存 "+new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}));}catch(e){}
   schedulePush();}
 loadEarlyEdits();
@@ -839,20 +1502,32 @@ function hl(s,q){if(!q||!s)return esc(s||"");
   else{i=s.toLowerCase().indexOf(q.toLowerCase());len=q.length;}  // まれな桁ずれ時は従来照合
   if(i<0)return esc(s);
   return esc(s.slice(0,i))+"<mark>"+esc(s.slice(i,i+len))+"</mark>"+esc(s.slice(i+len));}
-function worldShortFull(w){let s=w.replace(/（[^）]*）/g,"");
-  s=s.replace("ブライダルワールド【プランナーコース】","ブライダル(プランナー)");
-  s=s.replace("ブライダルワールド【ドレスコーディネーターコース】","ブライダル(ドレス)");
-  return s.replace("ワールド","").trim();}
-function worldRank(w){for(let i=0;i<WORLD_ORDER.length;i++){const p=WORLD_ORDER[i];
-  if(p.includes("プランナー")&&w.includes("プランナー"))return i;
-  if(p.includes("ドレス")&&w.includes("ドレス"))return i;
-  if(!p.includes("【")&&w.startsWith(p.replace("ワールド",""))&&!w.includes("【"))return i;}return 99;}
+/* コースの表示名を返す。データにはコースのキーが入っている想定だが、
+   正式名・表示名が入っていても引けるようにしておく（データ移行を不要にするため） */
+function worldShortFull(w){
+  const c=courseOf(w);
+  if(c)return c.short;
+  // 設定に無い値：括弧や「ワールド」を落とした形でもう一度照合してみる（旧データ対策）
+  const bare=String(w||"").replace(/（[^）]*）/g,"").replace(/【[^】]*】/g,"").replace(/ワールド/g,"").trim();
+  const c2=(CFG.courses||[]).find(x=>x.short===bare||String(x.short).replace(/\(.*?\)/g,"")===bare);
+  if(c2)return c2.short;
+  return bare||String(w||"").trim();
+}
+function worldRank(w){
+  const c=courseOf(w);
+  if(!c)return 99;
+  const i=(CFG.courses||[]).indexOf(c);
+  return i<0?99:i;
+}
 
 // 現在の曜日・時限
 function nowInfo(){const d=new Date(),min=d.getHours()*60+d.getMinutes();
-  const dayMap={1:"月",2:"火",3:"水",4:"木",5:"金"};const day=dayMap[d.getDay()]||null;
-  let period=null;for(const p of PERIODS){const[s,e]=PRANGE[p];if(min>=s&&min<=e){period=p;break;}}return{day,period};}
-const NOW=nowInfo();
+  const dayMap={0:"日",1:"月",2:"火",3:"水",4:"木",5:"金",6:"土"};
+  let day=dayMap[d.getDay()]||null;
+  if(day&&DAYS.length&&DAYS.indexOf(day)===-1)day=null; // 設定に無い曜日は対象外
+  let period=null;for(const p of PERIODS){const r=PRANGE[p];if(r&&min>=r[0]&&min<=r[1]){period=p;break;}}
+  return{day,period};}
+let NOW=nowInfo();
 document.getElementById("nowLabel").textContent=(NOW.day?`今日は${NOW.day}曜`:"今日は土日")+(NOW.period?` ・ ${NOW.period}限`:(NOW.day?" ・ 授業時間外":""));
 
 // ===== サジェスト（手入力＋候補表示） =====
@@ -1032,12 +1707,12 @@ function updateFreeRooms(){
   const area=document.getElementById("freeRoomArea");
   if(!editing){area.style.display="none";return;}
   const {day,period}=editing;
-  // 学校全体（全学年・全ワールド）の使用状況。ただし今編集中の枠自身は除外
+  // 学校全体（全学年・全コース）の使用状況。ただし今編集中の枠自身は除外
   const usedKey=day+"-"+period;
   const usedRooms=new Set();
   classData().forEach(r=>{
     if(r.day!==day||r.period!==period)return;
-    // 今編集している枠（同じ学年×ワールド×曜日×時限）は除外
+    // 今編集している枠（同じ学年×コース×曜日×時限）は除外
     if(r.grade===editGrade()&&worldShortFull(r.world)===cstate.world)return;
     normRooms(r.room).forEach(rm=>usedRooms.add(rm));
   });
@@ -1125,14 +1800,14 @@ function buildGrid(rows,q,opts){opts=opts||{};
 
 /* ========== クラスタブ ========== */
 const cstate={q:"",grade:null,world:null,day:null,period:null};
-/* ワールド用URL（?w=ワールド名、任意で&g=学年）：開いた時点でそのワールドを選択して表示する */
+/* コース用URL（?w=コース名、任意で&g=学年）：開いた時点でそのコースを選択して表示する */
 (function(){
   try{
     const mw=location.search.match(/[?&]w=([^&]+)/);
     if(!mw)return;
     const wname=decodeURIComponent(mw[1]);
     const all=new Set();[1,2,3,4].forEach(g=>(OPT.world_by_grade[String(g)]||[]).forEach(x=>all.add(worldShortFull(x))));
-    if(!all.has(wname))return; // 不明なワールド名は無視
+    if(!all.has(wname))return; // 不明なコース名は無視
     cstate.world=wname;
     const mg=location.search.match(/[?&]g=([1-4])/);
     if(mg){const g=+mg[1];
@@ -1141,9 +1816,7 @@ const cstate={q:"",grade:null,world:null,day:null,period:null};
 })();
 let worldGroups=[];
 function rebuildWorldChips(){
-  // 前期は実在ワールド、後期は学年別の全ワールド（空でも編集できるように）
-  // 学年が選択されていればその学年のワールドのみ表示
-  // 前期・後期とも、その学年に設定されている全ワールドを表示する
+  // 前期・後期とも同じ扱い：設定されているコースを常に表示する
   // （データが空でも選べるようにして、前期・後期それぞれ独立に時間割を組めるようにする）
   let ws;
   if(cstate.grade){
@@ -1165,12 +1838,14 @@ function makeChips(id,items,key,cls,st,fn){const el=document.getElementById(id);
   items.forEach(it=>{const c=document.createElement("div");c.className="chip"+(cls?" "+cls(it):"");
     c.textContent=it.label;c.onclick=()=>{st[key]=(st[key]===it.val)?null:it.val;fn();};
     c.dataset.val=it.val;c.dataset.key=key;if(cls)c.dataset.cls=cls(it);el.appendChild(c);});}
-makeChips("gradeChips",[1,2,3,4].map(g=>({label:g+"年",val:g})),"grade",it=>"g"+it.val,cstate,()=>{
-  // 学年を選んだ場合のみ、その学年に無いワールドだったらリセット。学年解除時はワールド保持
-  if(cstate.grade&&cstate.world){const stillValid=(OPT.world_by_grade[String(cstate.grade)]||[]).some(w=>worldShortFull(w)===cstate.world);if(!stillValid)cstate.world=null;}
-  rebuildWorldChips();renderClass();refreshChips("#classPanel",cstate);});
-makeChips("dayChips",DAYS.map(d=>({label:d,val:d})),"day",null,cstate,()=>{renderClass();refreshChips("#classPanel",cstate);});
-makeChips("periodChips",[1,2,3,4,5].map(p=>({label:p+"限",val:p})),"period",null,cstate,()=>{renderClass();refreshChips("#classPanel",cstate);});
+function buildClassChips(){
+  makeChips("gradeChips",gradeList().map(g=>({label:g+"年",val:g})),"grade",it=>"g"+it.val,cstate,()=>{
+    // 学年を選んだ場合のみ、その学年に無いコースだったらリセット。学年解除時はコース保持
+    if(cstate.grade&&cstate.world){const stillValid=(OPT.world_by_grade[String(cstate.grade)]||[]).some(w=>worldShortFull(w)===cstate.world);if(!stillValid)cstate.world=null;}
+    rebuildWorldChips();renderClass();refreshChips("#classPanel",cstate);});
+  makeChips("dayChips",DAYS.map(d=>({label:d,val:d})),"day",null,cstate,()=>{renderClass();refreshChips("#classPanel",cstate);});
+  makeChips("periodChips",PERIODS.map(p=>({label:p+"限",val:p})),"period",null,cstate,()=>{renderClass();refreshChips("#classPanel",cstate);});
+}
 function refreshChips(scope,st){document.querySelectorAll(scope+" .chip").forEach(c=>{
   const on=String(st[c.dataset.key])===c.dataset.val;c.classList.toggle("on",on);
   if(c.dataset.cls)c.classList.toggle(c.dataset.cls,on);});}
@@ -1181,12 +1856,12 @@ function renderEditToolbar(){
   if(!isLate()){
     // 前期：後期と同じ操作感（常に編集できる）
     tb.innerHTML=`<div class="edit-toolbar" style="background:var(--accent-soft);border-color:#cfe6ee">
-      <span class="et-label" style="color:var(--accent)">前期</span>
-      <span style="font-size:.82rem;color:var(--ink-soft)">学年とワールドを選ぶと、表のマスをクリックして授業を編集できます。</span>
+      <span class="et-label" style="color:var(--accent)">${termLabel("early")}</span>
+      <span style="font-size:.82rem;color:var(--ink-soft)">学年とコースを選ぶと、表のマスをクリックして授業を編集できます。</span>
       <button class="btn ghost" id="checkAll" style="margin-left:auto">整合チェック</button>
       <button class="btn ok" id="exportEarlyXlsx">Excel出力</button>
       <button class="btn ghost" id="yearMenuBtnE">年度メニュー</button>
-      <button class="btn ghost" id="worldUrlBtnE">ワールドURL一覧</button>
+      <button class="btn ghost" id="worldUrlBtnE">コースURL一覧</button>
     </div><div id="progressPanel"></div><div id="checkPanel"></div>`;
     document.getElementById("exportEarlyXlsx").onclick=exportEarlyExcel;
     document.getElementById("checkAll").onclick=()=>{checkOpen=!checkOpen;if(checkOpen)progressOpen=false;renderProgress();renderCheck();};
@@ -1197,7 +1872,7 @@ function renderEditToolbar(){
   }
   tb.innerHTML=`<div class="edit-toolbar">
     <span class="et-label">後期 編集モード</span>
-    <span style="font-size:.82rem;color:var(--ink-soft)">学年とワールドを選び、表のマスをクリックして授業を登録します（登録 ${lateRecords.length} コマ）</span>
+    <span style="font-size:.82rem;color:var(--ink-soft)">学年とコースを選び、表のマスをクリックして授業を登録します（登録 ${lateRecords.length} コマ）</span>
     <button class="btn ghost" id="toggleProgress" style="margin-left:auto">入力状況</button>
     <button class="btn ghost" id="checkAll">整合チェック</button>
     <button class="btn ghost" id="printClass">印刷</button>
@@ -1205,7 +1880,7 @@ function renderEditToolbar(){
     <button class="btn ghost" id="exportJson">JSON出力</button>
     <button class="btn ghost" id="importJson">JSON読込</button>
     <button class="btn ghost" id="yearMenuBtnL">年度メニュー</button>
-    <button class="btn ghost" id="worldUrlBtnL">ワールドURL一覧</button>
+    <button class="btn ghost" id="worldUrlBtnL">コースURL一覧</button>
     <button class="btn danger-ghost" id="resetLate">後期データを消去</button>
   </div><div id="progressPanel"></div><div id="checkPanel"></div>`;
   document.getElementById("exportXlsx").onclick=exportExcel;
@@ -1224,15 +1899,15 @@ let progressOpen=false;
 function renderProgress(){
   const panel=document.getElementById("progressPanel");if(!panel)return;
   if(!progressOpen){panel.innerHTML="";return;}
-  // 学年×ワールドのマトリクス。各セルは登録コマ数。クリックでそのワールドへ移動
+  // 学年×コースのマトリクス。各セルは登録コマ数。クリックでそのコースへ移動
   const grades=[1,2,3,4];
-  // 全ワールド短縮名（出現順）
+  // 全コース短縮名（出現順）
   const allShort=[];
   Object.values(OPT.world_by_grade).forEach(arr=>arr.slice().sort((a,b)=>worldRank(a)-worldRank(b)).forEach(w=>{const s=worldShortFull(w);if(!allShort.includes(s))allShort.push(s);}));
   function cellCount(g,wShort){return lateRecords.filter(r=>r.grade===g&&worldShortFull(r.world)===wShort).length;}
   function exists(g,wShort){return (OPT.world_by_grade[String(g)]||[]).some(w=>worldShortFull(w)===wShort);}
   let total=0,filled=0;
-  let thead='<tr><th class="pg-corner">学年＼ワールド</th>'+allShort.map(w=>`<th>${esc(w)}</th>`).join("")+'<th class="pg-sum">計</th></tr>';
+  let thead='<tr><th class="pg-corner">学年＼コース</th>'+allShort.map(w=>`<th>${esc(w)}</th>`).join("")+'<th class="pg-sum">計</th></tr>';
   let tbody=grades.map(g=>{
     let rowSum=0;
     let tds=allShort.map(w=>{
@@ -1244,9 +1919,9 @@ function renderProgress(){
     return `<tr><td class="pg-grade">${g}年</td>${tds}<td class="pg-sum">${rowSum}</td></tr>`;
   }).join("");
   panel.innerHTML=`<div class="progress-box">
-    <div class="pg-head">入力状況（学年×ワールドの登録コマ数）<span class="pg-stat">手付き ${filled} / ${total} 区分　・　合計 ${lateRecords.length} コマ</span></div>
+    <div class="pg-head">入力状況（学年×コースの登録コマ数）<span class="pg-stat">手付き ${filled} / ${total} 区分　・　合計 ${lateRecords.length} コマ</span></div>
     <div class="pg-scroll"><table class="pg-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>
-    <div class="pg-legend"><span class="lg z"></span>未入力　<span class="lg s"></span>入力中　<span class="lg f"></span>10コマ以上　<span style="color:var(--ink-soft)">／ セルをクリックでそのワールドへ</span></div>
+    <div class="pg-legend"><span class="lg z"></span>未入力　<span class="lg s"></span>入力中　<span class="lg f"></span>10コマ以上　<span style="color:var(--ink-soft)">／ セルをクリックでそのコースへ</span></div>
   </div>`;
   panel.querySelectorAll(".pg-cell").forEach(td=>{td.onclick=()=>{
     cstate.grade=+td.dataset.g;cstate.world=td.dataset.w;
@@ -1268,7 +1943,7 @@ function runIntegrityCheck(){
   function teacherList(t){return (t||"").split(/[／/]/).map(s=>s.trim()).filter(s=>s&&!s.includes("：")&&!s.includes(":")&&!GENERIC_TEACHERS.includes(s));}
   Object.keys(bySlot).forEach(k=>{
     const recs=bySlot[k];const [day,period]=k.split("-");
-    const cellKey=r=>[r.grade,r.world].join("|"); // 同じ枠（学年×ワールド）の識別
+    const cellKey=r=>[r.grade,r.world].join("|"); // 同じ枠（学年×コース）の識別
     // 教室重複：教室→[レコード]。同名科目は合同。同じ枠内（複数授業）は除外
     const roomMap={};
     recs.forEach(r=>{normRooms(r.room).forEach(rm=>{(roomMap[rm]=roomMap[rm]||[]).push(r);});});
@@ -1292,7 +1967,7 @@ function runIntegrityCheck(){
       }
     });
   });
-  // 空きコマ：登録済みの学年×ワールドについて、5日×5限のうち未入力のもの
+  // 空きコマ：登録済みの学年×コースについて、5日×5限のうち未入力のもの
   const filledWorlds=[...new Set(allData.map(r=>r.grade+"|"+r.world))];
   const emptySlots=[];
   filledWorlds.forEach(key=>{
@@ -1307,7 +1982,7 @@ function runIntegrityCheck(){
 function renderCheck(){
   const panel=document.getElementById("checkPanel");if(!panel)return;
   if(!checkOpen){panel.innerHTML="";return;}
-  const termL=term==="early"?"前期":"後期";
+  const termL=termLabel(term);
   if(!classData().length){panel.innerHTML=`<div class="check-box"><div class="ck-head">整合チェック</div><div class="ck-none">まだ${termL}の授業がありません。</div></div>`;return;}
   const {roomClashes,teacherClashes,emptySlots}=runIntegrityCheck();
   const totalIssues=roomClashes.length+teacherClashes.length;
@@ -1327,7 +2002,7 @@ function renderCheck(){
       c.items.map(it=>`<div class="ck-detail"><b>${it.grade}年 ${esc(it.world)}</b>：${esc(it.subject)}${it.room?`（${esc(it.room)}）`:""}</div>`).join("")+`</div>`).join("");
     html+='</div>';
   }
-  // 空きコマ（多いので学年×ワールド単位でまとめ、件数表示＋展開）
+  // 空きコマ（多いので学年×コース単位でまとめ、件数表示＋展開）
   if(emptySlots.length){
     const byWorld={};emptySlots.forEach(e=>{const k=e.grade+"|"+e.world;(byWorld[k]=byWorld[k]||[]).push(e);});
     html+='<div class="ck-section"><div class="ck-label info">空きコマ（'+emptySlots.length+'件）<span class="ck-hint">各コマをクリックでその枠へ移動</span></div>';
@@ -1383,37 +2058,44 @@ function buildPrintTable(title,sub,rows,theme){
   return `<div class="sheet"><div class="grid-head"><span class="gtitle">${escP(title)}</span><span class="gworld">${escP(sub)}</span></div><div class="table-scroll"><table class="week theme-${theme}"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div></div>`;
 }
 function escP(s){return (s||"").replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]));}
-/* ワールド別の印刷テーマ（ヘッダー行・時限列の色分け） */
+/* コース別の印刷テーマ（ヘッダー行・時限列の色分け） */
 function worldPrintTheme(wShort){
   if(!wShort)return null;
-  if(wShort.indexOf("ホテル")===0)return "w-hotel";
-  if(wShort.indexOf("観光")===0)return "w-tour";
-  if(wShort.indexOf("エアライン")===0||wShort.indexOf("エア"+"ーライン")===0)return "w-air";
-  if(wShort.indexOf("ブライダル")===0)return "w-bridal";
-  return null; // 画面は w-*、印刷は theme-w-* をclassに使う
+  const c=courseOf(wShort);
+  return c?("w-"+c.key):null; // 画面は w-*、印刷は theme-w-* をclassに使う
+}
+/* 印刷ウィンドウ用のコース色CSSを組み立てる */
+function printCourseCSS(){
+  return (CFG.courses||[]).map(c=>{
+    const t=courseTheme(c.color);
+    return `table.week.theme-w-${c.key} thead th{background:${t.head};color:${t.headText}}`+
+      `table.week.theme-w-${c.key} thead th.corner{background:${t.corner}}`+
+      `table.week.theme-w-${c.key} td.period-cell{background:${t.side};color:${t.sideText}}`+
+      `table.week.theme-w-${c.key} td.period-cell .ptime{color:${t.sideSub}}`;
+  }).join("\n    ");
 }
 function printTimetable(kind){
   let sheets="",docTitle="",theme="accent";
   if(kind==="class"){
-    if(!cstate.grade||!cstate.world){alert("印刷するには、学年とワールドを1つずつ選んで時間割を表示してください。");return;}
+    if(!cstate.grade||!cstate.world){alert("印刷するには、学年とコースを1つずつ選んで時間割を表示してください。");return;}
     theme=worldPrintTheme(cstate.world)||(isLate()?"edit":"accent");
     const wfull=fullWorldName(cstate.grade,cstate.world);
     const rows=classData().filter(r=>r.grade===cstate.grade&&worldShortFull(r.world)===cstate.world);
     docTitle=`${cstate.grade}年 ${cstate.world} 時間割`;
-    sheets=buildPrintTable(`${cstate.grade}年 ${cstate.world}`,`2026年度 ${term==="early"?"前期":"後期"} ／ ${wfull}`,rows,theme);
+    sheets=buildPrintTable(`${cstate.grade}年 ${cstate.world}`,`${schoolYear}年度 ${termLabel(term)} ／ ${wfull}`,rows,theme);
   }else if(kind==="person-one"){
     const pinfo=personList().find(p=>p.name===pstate.person)||{};
     theme=worldPrintTheme(pinfo.world?worldShortFull(pinfo.world):null)||(isLate()?"edit":"person");
     const rows=personRecords().filter(r=>r.person===pstate.person);
     docTitle=`${pstate.person} 時間割`;
-    sheets=buildPrintTable(`${pstate.person}`,`2026年度 ${term==="early"?"前期":"後期"} ／ ${pinfo.grade}年${pinfo.world?" "+worldShortFull(pinfo.world):""}`,rows,theme);
+    sheets=buildPrintTable(`${pstate.person}`,`${schoolYear}年度 ${termLabel(term)} ／ ${pinfo.grade}年${pinfo.world?" "+worldShortFull(pinfo.world):""}`,rows,theme);
   }else if(kind==="person-all"){
     theme=isLate()?"edit":"person";
     docTitle="学生別時間割（全員）";
     sheets=personList().map(p=>{
       const rows=personRecords().filter(r=>r.person===p.name);
       const th=worldPrintTheme(p.world?worldShortFull(p.world):null)||theme;
-      return buildPrintTable(p.name,`2026年度 ${term==="early"?"前期":"後期"} ／ ${p.grade}年${p.world?" "+worldShortFull(p.world):""}`,rows,th);
+      return buildPrintTable(p.name,`${schoolYear}年度 ${termLabel(term)} ／ ${p.grade}年${p.world?" "+worldShortFull(p.world):""}`,rows,th);
     }).join('<div class="pgbreak"></div>');
   }
   const w=window.open("","_blank");
@@ -1443,23 +2125,8 @@ function printTimetable(kind){
     table.week.theme-edit thead th.corner{background:var(--edit-d)}
     table.week.theme-person thead th{background:var(--person)}
     table.week.theme-person thead th.corner{background:var(--person-d)}
-    /* ワールド別カラー：ホテル=深緑（白文字）、観光=黄色・エアライン=水色・ブライダル=ピンク（濃色文字） */
-    table.week.theme-w-hotel thead th{background:#1E5B3C;color:#fff}
-    table.week.theme-w-hotel thead th.corner{background:#14432C}
-    table.week.theme-w-hotel td.period-cell{background:#E4F0E9;color:#1B4A31}
-    table.week.theme-w-hotel td.period-cell .ptime{color:#4C7A62}
-    table.week.theme-w-tour thead th{background:#F5C826;color:#4A3A00}
-    table.week.theme-w-tour thead th.corner{background:#E0B312}
-    table.week.theme-w-tour td.period-cell{background:#FBF1CB;color:#5C4A00}
-    table.week.theme-w-tour td.period-cell .ptime{color:#8A7420}
-    table.week.theme-w-air thead th{background:#8ED2EC;color:#0C3D52}
-    table.week.theme-w-air thead th.corner{background:#6FC2E1}
-    table.week.theme-w-air td.period-cell{background:#E6F5FB;color:#0F455C}
-    table.week.theme-w-air td.period-cell .ptime{color:#3C7A94}
-    table.week.theme-w-bridal thead th{background:#F4B4CC;color:#6E1F44}
-    table.week.theme-w-bridal thead th.corner{background:#EC98B9}
-    table.week.theme-w-bridal td.period-cell{background:#FBE9F1;color:#762450}
-    table.week.theme-w-bridal td.period-cell .ptime{color:#A65B80}
+    /* コース別カラー（設定のコース色から自動生成） */
+    ${printCourseCSS()}
     table.week thead th.todaycol{box-shadow:inset 0 -3px 0 var(--now)}
     table.week td.period-cell{background:var(--line-soft);text-align:center;font-weight:700;color:var(--ink);
       font-size:.8rem;padding:8px 6px;width:78px;white-space:nowrap}
@@ -1508,30 +2175,30 @@ function renderClass(){
     if(q){const h=normQ(r.subject+" "+r.teacher+" "+r.room+" "+(r.note||""));if(!h.includes(q))return false;}return true;});
   const note=document.getElementById("classNote"),out=document.getElementById("classOut");
   const gset=new Set(rows.map(r=>r.grade)),wset=new Set(rows.map(r=>worldShortFull(r.world)));
-  // 編集モード（後期 or 前期編集ON）: 学年×ワールドが1つに定まれば編集グリッド
+  // 編集モード（後期 or 前期編集ON）: 学年×コースが1つに定まれば編集グリッド
   if(isEditable()&&cstate.grade&&cstate.world){
     const wfull=fullWorldName(cstate.grade,cstate.world);
     const gridRows=classData().filter(r=>r.grade===cstate.grade&&worldShortFull(r.world)===cstate.world);
-    const termLabel=isLate()?"後期":"前期";
+    const termName=termLabel(isLate()?"late":"early");
     note.innerHTML=`<div class="mode-note e"><b>${cstate.grade}年 ${cstate.world}</b>　マスをクリックで${isLate()?'登録・':''}編集、授業を<b>ドラッグして別のマスへ移動</b>できます。黄色は現在のコマです。</div>`;
-    out.innerHTML=`<div class="grid-head"><span class="gtitle">${cstate.grade}年 ${cstate.world}</span><span class="gworld">${termLabel} / ${wfull}</span><button class="btn ghost btn-sm" id="copyDayBtn">曜日コピー</button><button class="btn ghost btn-sm" id="printClassOne" style="margin-left:8px">印刷</button></div>`+buildGrid(gridRows,q,{cls:"e",editable:true,day:cstate.day,period:cstate.period,world:cstate.world});
+    out.innerHTML=`<div class="grid-head"><span class="gtitle">${cstate.grade}年 ${cstate.world}</span><span class="gworld">${termName} / ${wfull}</span><button class="btn ghost btn-sm" id="copyDayBtn">曜日コピー</button><button class="btn ghost btn-sm" id="printClassOne" style="margin-left:8px">印刷</button></div>`+buildGrid(gridRows,q,{cls:"e",editable:true,day:cstate.day,period:cstate.period,world:cstate.world});
     bindEditCells();
     const pb=document.getElementById("printClassOne");if(pb)pb.onclick=()=>printTimetable("class");
     const cd=document.getElementById("copyDayBtn");if(cd)cd.onclick=openCopyDayModal;
     return;
   }
-  // ワールドのみ選択（学年未選択）：学年ごとの週間表を縦に並べる（編集可）。後期で空でも表示
+  // コースのみ選択（学年未選択）：学年ごとの週間表を縦に並べる（編集可）。後期で空でも表示
   if(cstate.world&&!cstate.grade){
     const wShort=cstate.world;
     const grades=[1,2,3,4].filter(g=>(OPT.world_by_grade[String(g)]||[]).some(w=>worldShortFull(w)===wShort));
-    note.innerHTML=`<div class="mode-note ${isEditable()?'e':''}"><b>${esc(wShort)}ワールド</b>　全学年の週間表を並べて表示しています。${isEditable()?'各マスをクリックで編集できます。':''}黄色は現在のコマです。</div>`;
+    note.innerHTML=`<div class="mode-note ${isEditable()?'e':''}"><b>${esc(wShort)}コース</b>　全学年の週間表を並べて表示しています。${isEditable()?'各マスをクリックで編集できます。':''}黄色は現在のコマです。</div>`;
     let html="";
     grades.forEach(g=>{
       const wfull=fullWorldName(g,wShort);
       const grows=classData().filter(r=>r.grade===g&&worldShortFull(r.world)===wShort
         &&(!cstate.day||r.day===cstate.day)&&(!cstate.period||r.period===cstate.period)
         &&(!q||normQ(r.subject+" "+r.teacher+" "+r.room+" "+(r.note||"")).includes(q)));
-      html+=`<div class="multi-grid"><div class="grid-head"><span class="gtitle">${g}年 ${esc(wShort)}</span><span class="gworld">${term==="early"?"前期":"後期"} / ${esc(wfull)}</span><button class="btn ghost btn-sm" data-print-g="${g}">印刷</button></div>`+
+      html+=`<div class="multi-grid"><div class="grid-head"><span class="gtitle">${g}年 ${esc(wShort)}</span><span class="gworld">${termLabel(term)} / ${esc(wfull)}</span><button class="btn ghost btn-sm" data-print-g="${g}">印刷</button></div>`+
         buildGrid(grows,q,{cls:isEditable()?"e":"",editable:isEditable(),grade:g,day:cstate.day,period:cstate.period,world:cstate.world})+`</div>`;
     });
     out.innerHTML=html;
@@ -1542,23 +2209,23 @@ function renderClass(){
   }
   if(!rows.length){
     if(isLate()){
-      if(isEditable()){note.innerHTML='<div class="mode-note e"><b>後期編集モード</b>　学年とワールドを選ぶと、編集用の週間表が開きます。空の状態から授業を入力していけます。</div>';
-        out.innerHTML='<div class="empty"><div class="big">学年とワールドを選んでください</div><div>後期の授業をマス目に入力していきます。</div></div>';return;}
-      note.innerHTML='<div class="mode-note"><b>後期</b>　学年とワールドを選ぶと、後期の週間表を表示します。</div>';
-      out.innerHTML='<div class="empty"><div class="big">学年とワールドを選んでください</div></div>';return;}
-    if(isEditable()){note.innerHTML='<div class="mode-note e"><b>前期</b>　学年とワールドを選ぶと、編集できる週間表が開きます。</div>';
-      out.innerHTML='<div class="empty"><div class="big">学年とワールドを選んでください</div><div>前期の授業をマス目に入力していきます。</div></div>';return;}
+      if(isEditable()){note.innerHTML='<div class="mode-note e"><b>後期編集モード</b>　学年とコースを選ぶと、編集用の週間表が開きます。空の状態から授業を入力していけます。</div>';
+        out.innerHTML='<div class="empty"><div class="big">学年とコースを選んでください</div><div>後期の授業をマス目に入力していきます。</div></div>';return;}
+      note.innerHTML='<div class="mode-note"><b>後期</b>　学年とコースを選ぶと、後期の週間表を表示します。</div>';
+      out.innerHTML='<div class="empty"><div class="big">学年とコースを選んでください</div></div>';return;}
+    if(isEditable()){note.innerHTML='<div class="mode-note e"><b>'+termLabel("early")+'</b>　学年とコースを選ぶと、編集できる週間表が開きます。</div>';
+      out.innerHTML='<div class="empty"><div class="big">学年とコースを選んでください</div></div>';return;}
     note.innerHTML="";out.innerHTML='<div class="empty"><div class="big">該当する授業がありません</div></div>';return;}
   if(gset.size===1&&wset.size===1){
     const noteCls=isEditable()?"e":"";
-    note.innerHTML=`<div class="mode-note ${noteCls}"><b>週間表示</b>　学年とワールドを1つずつ選ぶと時間割表になります。黄色は現在のコマです。</div>`;
-    out.innerHTML=`<div class="grid-head"><span class="gtitle">${rows[0].grade}年 ${wset.values().next().value}</span><span class="gworld">${term==="early"?"前期":"後期"} / ${rows[0].world}</span><button class="btn ghost btn-sm" id="printClassOne">印刷</button></div>`+buildGrid(rows,q,{cls:isEditable()?"e":"",editable:isEditable(),day:cstate.day,period:cstate.period,world:wset.values().next().value});
+    note.innerHTML=`<div class="mode-note ${noteCls}"><b>週間表示</b>　学年とコースを1つずつ選ぶと時間割表になります。黄色は現在のコマです。</div>`;
+    out.innerHTML=`<div class="grid-head"><span class="gtitle">${rows[0].grade}年 ${wset.values().next().value}</span><span class="gworld">${termLabel(term)} / ${rows[0].world}</span><button class="btn ghost btn-sm" id="printClassOne">印刷</button></div>`+buildGrid(rows,q,{cls:isEditable()?"e":"",editable:isEditable(),day:cstate.day,period:cstate.period,world:wset.values().next().value});
     if(isEditable())bindEditCells();
     const pb=document.getElementById("printClassOne");if(pb)pb.onclick=()=>printTimetable("class");
   }else{
-    // 複数の学年・ワールドにまたがる結果も、学年×ワールドごとの時間割グリッドで表示する
-    note.innerHTML='<div class="mode-note">複数の学年・ワールドに該当したため、<b>組み合わせごとの時間割</b>で表示中。'+(isEditable()?'編集するには学年とワールドを選んでください。':'')+'</div>';
-    // グループ化：学年 → ワールド（定義順）
+    // 複数の学年・コースにまたがる結果も、学年×コースごとの時間割グリッドで表示する
+    note.innerHTML='<div class="mode-note">複数の学年・コースに該当したため、<b>組み合わせごとの時間割</b>で表示中。'+(isEditable()?'編集するには学年とコースを選んでください。':'')+'</div>';
+    // グループ化：学年 → コース（定義順）
     const groups={};
     rows.forEach(r=>{const k=r.grade+"|"+worldShortFull(r.world);(groups[k]=groups[k]||[]).push(r);});
     const keys=Object.keys(groups).sort((a,b)=>{
@@ -1571,14 +2238,21 @@ function renderClass(){
       const [gStr,wShort]=k.split("|");const g=+gStr;
       const grows=groups[k];
       const wfull=fullWorldName(g,wShort);
-      return `<div class="multi-grid"><div class="grid-head"><span class="gtitle">${g}年 ${esc(wShort)}</span><span class="gworld">${term==="early"?"前期":"後期"} / ${esc(wfull)}</span></div>`+
+      return `<div class="multi-grid"><div class="grid-head"><span class="gtitle">${g}年 ${esc(wShort)}</span><span class="gworld">${termLabel(term)} / ${esc(wfull)}</span></div>`+
         buildGrid(grows,q,{cls:"",editable:false,day:cstate.day,period:cstate.period,world:wShort})+`</div>`;
     }).join("");
   }
 }
 function fullWorldName(grade,shortName){
-  const ws=OPT.world_by_grade[String(grade)]||[];
-  return ws.find(w=>worldShortFull(w)===shortName)||shortName;
+  const c=courseOf(shortName);
+  // 学年ごとに正式名称が違う場合はそれを優先（例：4年だけ「（4年制）」）
+  if(c&&c.fullByGrade&&c.fullByGrade[String(grade)])return c.fullByGrade[String(grade)];
+  return c?(c.full||c.short):shortName; // 表示用の正式名称
+}
+/* 保存用：時間割データにはコースの「キー」を入れる（表示名を変えてもデータ不変） */
+function courseKeyFromShort(shortName){
+  const c=courseOf(shortName);
+  return c?c.key:shortName;
 }
 function bindEditCells(){
   document.querySelectorAll("#classOut td.slot[data-d]").forEach(td=>{
@@ -1635,7 +2309,7 @@ function moveLateCell(fromD,fromP,toD,toP,grade){
 
 /* 曜日コピー：ある曜日の全コマを別の曜日に複製 */
 function openCopyDayModal(){
-  if(!cstate.grade||!cstate.world){alert("学年とワールドを選んでください");return;}
+  if(!cstate.grade||!cstate.world){alert("学年とコースを選んでください");return;}
   document.getElementById("cdSlot").textContent=`${cstate.grade}年 ${cstate.world}`;
   let cdFrom=null,cdTo=null;
   const fromSeg=document.getElementById("cdFromSeg"),toSeg=document.getElementById("cdToSeg");
@@ -1697,9 +2371,9 @@ function cellRecords(g,wShort,d,p){
 function findLate(g,wShort,d,p){return cellRecords(g,wShort,d,p)[0];}
 // 枠の授業リストをまるごと保存（前期＝差分、後期＝lateRecords）。recsは0件以上の配列
 function saveCellRecords(grade,wShort,day,period,recs){
-  const wfull=fullWorldName(grade,wShort);
-  // 値を正規化
-  const norm=recs.map(r=>({grade:grade,world:wfull,day:day,period:period,time:PTIME_FULL[period],
+  const wkey=courseKeyFromShort(wShort);
+  // 値を正規化（world にはコースのキーを保存する）
+  const norm=recs.map(r=>({grade:grade,world:wkey,day:day,period:period,time:PTIME_FULL[period],
     subject:r.subject,teacher:r.teacher||"",room:r.room||"",note:r.note||""}));
   if(isLate()){
     // 該当枠の既存を全削除→入れ直し
@@ -1785,7 +2459,7 @@ function commitFormToEditing(silent){
   else{editing.recs.push(data);editing.idx=editing.recs.length-1;}
   return true;
 }
-/* ========== 枠コピー：この枠の複数授業を、他の曜日・時限／他ワールドへまとめて複製 ========== */
+/* ========== 枠コピー：この枠の複数授業を、他の曜日・時限／他コースへまとめて複製 ========== */
 let scSrc=null;const scSel={worlds:new Set(),slots:new Set()};
 function openSlotCopy(){
   if(!editing||!editing.recs.length)return;
@@ -1815,7 +2489,7 @@ function renderScGrid(){
     html+=`<div class="sc-h">${p}限</div>`;
     DAYS.forEach(d=>{
       const key=d+"|"+p;
-      // 選択中のワールドのどこかに既存授業があれば「授業あり」
+      // 選択中のコースのどこかに既存授業があれば「授業あり」
       const has=[...scSel.worlds].some(w=>cellRecords(scSrc.grade,w,d,p).length>0);
       const isSrc=(d===scSrc.day&&p===scSrc.period);
       html+=`<div class="sc-cell${scSel.slots.has(key)?' on':''}" data-k="${key}">${isSrc?'元':'&nbsp;'}${has?'<span class="sc-has">授業あり</span>':'<span class="sc-has">&nbsp;</span>'}</div>`;
@@ -1829,7 +2503,7 @@ function renderScGrid(){
 }
 function execSlotCopy(){
   if(!scSrc)return;
-  if(!scSel.worlds.size){alert("コピー先のワールドを選んでください。");return;}
+  if(!scSel.worlds.size){alert("コピー先のコースを選んでください。");return;}
   if(!scSel.slots.size){alert("コピー先の曜日・時限を選んでください。");return;}
   // コピー先一覧を作成（コピー元自身は除外）
   const dests=[];
@@ -1887,9 +2561,9 @@ document.getElementById("mDelete").onclick=()=>{
 
 /* ========== 学生タブ ========== */
 const pstate={q:"",person:null};
-const STORE_PKEY="thl_kouki_persons_v1";
-const STORE_PREC="thl_kouki_personrecs_v1";
-const STORE_PREC_E="thl_zenki_personrecs_v1";
+const STORE_PKEY="tt_kouki_persons_v1";
+const STORE_PREC="tt_kouki_personrecs_v1";
+const STORE_PREC_E="tt_zenki_personrecs_v1";
 /* 学生の名簿（latePersons）は前期・後期で共通。個別の時間割は学期ごとに持つ（earlyP / lateP）。 */
 let latePersons=[],lateP=[],earlyP=[];
 function loadLateP(){try{const a=localStorage.getItem(STORE_PKEY);if(a)latePersons=JSON.parse(a);
@@ -1926,7 +2600,7 @@ function rebuildPersonPick(){
     b.onclick=()=>{pstate.person=(pstate.person===b.dataset.name)?null:b.dataset.name;renderPerson();};
   });
 }
-/* ワールド（コース）ごとの閲覧URL一覧をテキストで書き出す（誰に配ってもよい公開URL） */
+/* コース（コース）ごとの閲覧URL一覧をテキストで書き出す（誰に配ってもよい公開URL） */
 function exportWorldUrls(){
   const base=(location.origin&&location.origin!=="null"&&location.protocol!=="file:")?location.origin:"https://（あなたのURL）.vercel.app";
   const order=[];const seen=new Set();
@@ -1936,19 +2610,19 @@ function exportWorldUrls(){
   const K2={};Object.keys(WORLD_URL_KEYS).forEach(k=>{K2[WORLD_URL_KEYS[k]]=k;});
   const wp=sh=>K2[sh]||encodeURIComponent(sh);
   const yq="y="+schoolYear; // 年度付きURL（この年度専用。翌年度になると旧URLは案内表示になる）
-  let txt="ワールド（コース）別 時間割URL一覧（"+schoolYear+"年度）\n作成: "+new Date().toLocaleString("ja-JP")+"\n";
-  txt+="※クラス時間割の公開ページを、そのワールドを選択した状態で開くURLです。在校生に配ってください。\n";
+  let txt="コース（コース）別 時間割URL一覧（"+schoolYear+"年度）\n作成: "+new Date().toLocaleString("ja-JP")+"\n";
+  txt+="※クラス時間割の公開ページを、そのコースを選択した状態で開くURLです。在校生に配ってください。\n";
   txt+="※これらは"+schoolYear+"年度専用のURLです。新年度に切り替えたら、新しいURLを配り直してください（古いURLは案内画面になります）。\n\n";
-  txt+="■ 閲覧トップ（学年・ワールドを自分で選ぶ）\n";
+  txt+="■ 閲覧トップ（学年・コースを自分で選ぶ）\n";
   txt+="全体\t"+base+"/?"+yq+"\n\n";
-  txt+="■ ワールド全体（全学年をまとめて表示）\n";
+  txt+="■ コース全体（全学年をまとめて表示）\n";
   txt+=order.map(sh=>`${sh}\t${base}/?${yq}&w=${wp(sh)}`).join("\n");
   txt+="\n\n■ 学年別\n";
   [1,2,3,4].forEach(g=>{(OPT.world_by_grade[String(g)]||[]).forEach(x=>{const sh=worldShortFull(x);
     txt+=`${g}年 ${sh}\t${base}/?${yq}&w=${wp(sh)}&g=${g}\n`;});});
   const blob=new Blob([txt],{type:"text/plain;charset=utf-8"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);
-  a.download="ワールドURL一覧_"+schoolYear+"年度.txt";a.click();
+  a.download="コースURL一覧_"+schoolYear+"年度.txt";a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
 /* 学生ごとの閲覧URL一覧をテキストで書き出す（本人にのみ配布する） */
@@ -1982,7 +2656,7 @@ function renderPersonToolbar(){
   document.getElementById("exportPJson").onclick=exportPersonJson;
   document.getElementById("importPJson").onclick=importPersonJson;
   document.getElementById("printPersonAll").onclick=()=>{if(!latePersons.length){alert("学生が登録されていません");return;}printTimetable("person-all");};
-  document.getElementById("resetLateP").onclick=()=>{if(confirm("学生別データ（学生の名簿と、前期・後期の個別時間割）をすべて消去します。よろしいですか？")){latePersons=[];lateP=[];earlyP=[];saveLateP();pstate.person=null;rebuildPersonPick();renderPerson();}};
+  document.getElementById("resetLateP").onclick=()=>{if(confirm("後期の学生別データ（学生と時間割）をすべて消去します。よろしいですか？")){latePersons=[];lateP=[];saveLateP();pstate.person=null;rebuildPersonPick();renderPerson();}};
 }
 function renderPerson(){const q=normQ(pstate.q).trim();
   renderPersonToolbar();
@@ -2049,11 +2723,11 @@ function openStudentModal(name){
     if(name){
       const old=latePersons.find(x=>x.name===name);
       if(nm!==name)[lateP,earlyP].forEach(arr=>arr.forEach(r=>{if(r.person===name)r.person=nm;}));
-      old.name=nm;old.grade=selGrade;old.world=selWorld;pstate.person=nm;
+      old.name=nm;old.grade=selGrade;old.world=selWorld?courseKeyFromShort(worldShortFull(selWorld)):null;pstate.person=nm;
     }else{
-      latePersons.push({name:nm,grade:selGrade,world:selWorld});
+      latePersons.push({name:nm,grade:selGrade,world:selWorld?courseKeyFromShort(worldShortFull(selWorld)):null});
       if(selWorld){
-        classData().filter(r=>r.grade===selGrade&&r.world===selWorld).forEach(r=>{
+        classData().filter(r=>r.grade===selGrade&&worldShortFull(r.world)===worldShortFull(selWorld)).forEach(r=>{
           personRecords().push({person:nm,grade:selGrade,day:r.day,period:r.period,time:r.time,subject:r.subject,teacher:r.teacher,room:r.room,note:r.note||""});
         });
       }
@@ -2129,7 +2803,7 @@ async function exportPersonExcel(){
   });
   const buf=await wb.xlsx.writeBuffer();
   const blob=new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
-  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="2026年度後期_THL学生別時間割.xlsx";a.click();
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`${schoolYear}年度${termLabel("late")}_${brandFile()}学生別時間割.xlsx`;a.click();
 }
 function exportPersonJson(){
   if(!latePersons.length){alert("学生が登録されていません");return;}
@@ -2161,12 +2835,14 @@ function normRooms(rm){
 function roomUsage(grade){const use={};ROOMS.forEach(rm=>use[rm]={});
   classData().forEach(r=>{if(grade&&r.grade!==grade)return;normRooms(r.room).forEach(rm=>{
     (use[rm][r.day+"-"+r.period]=use[rm][r.day+"-"+r.period]||[]).push(r);});});return use;}
-makeChips("freeDayChips",DAYS.map(d=>({label:d,val:d})),"day",null,fstate,()=>{renderFree();refreshChips("#freeView",fstate);});
-makeChips("freePeriodChips",[1,2,3,4,5].map(p=>({label:p+"限",val:p})),"period",null,fstate,()=>{renderFree();refreshChips("#freeView",fstate);});
+function buildFreeChips(){
+  makeChips("freeDayChips",DAYS.map(d=>({label:d,val:d})),"day",null,fstate,()=>{renderFree();refreshChips("#freeView",fstate);});
+  makeChips("freePeriodChips",PERIODS.map(p=>({label:p+"限",val:p})),"period",null,fstate,()=>{renderFree();refreshChips("#freeView",fstate);});
+}
 function roomCard(rm,extra,busy){return `<div class="room-card ${busy?'busy-card':roomCat(rm)}"><span class="room-name">${esc(rm)}</span>${extra||""}</div>`;}
 function renderFree(){const note=document.getElementById("freeNote"),out=document.getElementById("freeOut");
   const use=roomUsage();const gl="";
-  const termL=term==="early"?"前期":"後期";
+  const termL=termLabel(term);
   const day=fstate.day,period=fstate.period;
   if(!day||!period){const hint=(NOW.day&&NOW.period)?`いまは ${NOW.day}曜${NOW.period}限 です。`:"";
     note.innerHTML=`<div class="mode-note f"><b>空き教室を探す（${termL}）</b>　曜日と時限を選ぶと、その時間に空いている教室が表示されます。${hint}${gl}</div>`;
@@ -2185,17 +2861,19 @@ function renderFree(){const note=document.getElementById("freeNote"),out=documen
   html+= busy.length?'<div class="room-list">'+busy.map(b=>roomCard(b.rm,`<span class="room-busy">${esc(b.subs[0].subject)}${b.subs.length>1?" 他":""}</span>`,true)).join("")+'</div>':'<div class="fs-none">使用中の教室はありません</div>';
   html+='</div>';out.innerHTML=html;}
 
-/* ========== 時限別一覧ビュー（全ワールド横断） ========== */
+/* ========== 時限別一覧ビュー（全コース横断） ========== */
 const sstate={day:null,period:null};
-makeChips("slotDayChips",DAYS.map(d=>({label:d,val:d})),"day",null,sstate,()=>{renderSlot();refreshChips("#slotView",sstate);});
-makeChips("slotPeriodChips",[1,2,3,4,5].map(p=>({label:p+"限",val:p})),"period",null,sstate,()=>{renderSlot();refreshChips("#slotView",sstate);});
+function buildSlotChips(){
+  makeChips("slotDayChips",DAYS.map(d=>({label:d,val:d})),"day",null,sstate,()=>{renderSlot();refreshChips("#slotView",sstate);});
+  makeChips("slotPeriodChips",PERIODS.map(p=>({label:p+"限",val:p})),"period",null,sstate,()=>{renderSlot();refreshChips("#slotView",sstate);});
+}
 function renderSlot(){
   const note=document.getElementById("slotNote"),out=document.getElementById("slotOut");
-  const termL=term==="early"?"前期":"後期";
+  const termL=termLabel(term);
   const {day,period}=sstate;
   if(!day||!period){
     const hint=(NOW.day&&NOW.period)?`いまは ${NOW.day}曜${NOW.period}限 です。`:"";
-    note.innerHTML=`<div class="mode-note"><b>時限別一覧（${termL}）</b>　曜日と時限を選ぶと、その時間に開講される全学年・全ワールドの授業と使用教室を一覧できます。${hint}</div>`;
+    note.innerHTML=`<div class="mode-note"><b>時限別一覧（${termL}）</b>　曜日と時限を選ぶと、その時間に開講される全学年・全コースの授業と使用教室を一覧できます。${hint}</div>`;
     out.innerHTML='<div class="empty"><div class="big">曜日と時限を選んでください</div><div>当て込み中の時間帯の埋まり具合を一望できます。</div></div>';return;}
   // その曜日時限の全授業
   const recs=classData().filter(r=>r.day===day&&r.period===period);
@@ -2203,16 +2881,16 @@ function renderSlot(){
   const usedRooms=new Set();recs.forEach(r=>normRooms(r.room).forEach(rm=>usedRooms.add(rm)));
   const freeRooms=ROOMS.filter(rm=>!usedRooms.has(rm));
   note.innerHTML=`<div class="mode-note"><b>${day}曜 ${period}限</b>（${PTIME_FULL[period]}）／ ${termL}　開講 ${recs.length} 件・使用教室 ${usedRooms.size}/${ROOMS.length}室</div>`;
-  // 学年→ワールド順に並べる
+  // 学年→コース順に並べる
   recs.sort((a,b)=>a.grade-b.grade||worldRank(a.world)-worldRank(b.world));
-  let html='<div class="slot-table-wrap"><table class="slot-table"><thead><tr><th>学年</th><th>ワールド</th><th>科目</th><th>教員</th><th>教室</th></tr></thead><tbody>';
+  let html='<div class="slot-table-wrap"><table class="slot-table"><thead><tr><th>学年</th><th>コース</th><th>科目</th><th>教員</th><th>教室</th></tr></thead><tbody>';
   if(recs.length){
     // 教室重複を検出（別科目で同教室）
     const roomToSubj={};recs.forEach(r=>normRooms(r.room).forEach(rm=>{(roomToSubj[rm]=roomToSubj[rm]||new Set()).add(r.subject+"|"+r.grade+"|"+r.world);}));
     html+=recs.map(r=>{
       const rrooms=normRooms(r.room);
       const dup=rrooms.some(rm=>{const set=roomToSubj[rm];if(!set||set.size<2)return false;
-        // 別の枠（学年×ワールド）で同教室かつ別科目があるか
+        // 別の枠（学年×コース）で同教室かつ別科目があるか
         return recs.some(o=>o!==r&&normRooms(o.room).includes(rm)&&o.subject!==r.subject&&!(o.grade===r.grade&&o.world===r.world));});
       const g="g"+r.grade;
       return `<tr class="${dup?'slot-dup':''}"><td><span class="tag grade ${g}">${r.grade}年</span></td><td>${esc(worldShortFull(r.world))}</td><td><b>${esc(r.subject)}</b></td><td>${esc(r.teacher||"-")}</td><td>${esc(r.room||"-")}${dup?' <span class="dup-mark">⚠重複</span>':''}</td></tr>`;
@@ -2237,7 +2915,7 @@ function rebuildRoomPick(){
 }
 function renderRoom(){
   const note=document.getElementById("roomNote"),out=document.getElementById("roomOut");
-  const termL=term==="early"?"前期":"後期";
+  const termL=termLabel(term);
   if(!rstate.room){
     note.innerHTML=`<div class="mode-note"><b>教室別の使用状況（${termL}）</b>　教室を選ぶと、その教室が週のどこで使われているかを週間表で確認できます。空いている枠を狙って当て込めます。</div>`;
     out.innerHTML='<div class="empty"><div class="big">教室を選んでください</div></div>';return;}
@@ -2258,7 +2936,7 @@ function renderRoom(){
   }).join("");
   out.innerHTML=`<div class="grid-head"><span class="gtitle">${esc(rm)}</span><span class="gworld">${termL} / 週間使用状況</span></div><div class="table-scroll"><table class="week">${`<thead>${thead}</thead><tbody>${tbody}</tbody>`}</table></div>`;
 }
-// ツールの週間表と同じ「縦＝時限・横＝曜日」を学年×ワールドごとに縦に積む
+// ツールの週間表と同じ「縦＝時限・横＝曜日」を学年×コースごとに縦に積む
 async function exportExcel(){exportClassExcel("late");}
 async function exportEarlyExcel(){exportClassExcel("early");}
 async function exportClassExcel(which){
@@ -2266,23 +2944,23 @@ async function exportClassExcel(which){
   const data=isEarly?earlyData():lateRecords;
   if(!data.length){alert(isEarly?"前期の授業データがありません":"後期の授業がまだ登録されていません");return;}
   if(typeof ExcelJS==="undefined"){alert("Excelライブラリの読み込みに失敗しました。ネット接続を確認して再読み込みしてください。");return;}
-  const termLabel=isEarly?"前期":"後期";
+  const termName=isEarly?termLabel("early"):termLabel("late");
   const C={header:"FF0B6E8F",headerDark:"FF0A5570",period:"FFEEF1F6",
     worldTitle:isEarly?"FF0B6E8F":"FF7A4EA8",  // 前期=青、後期=紫
     white:"FFFFFFFF",ink:"FF1A2332",line:"FFDDE3EC",fill:"FFF3FBF5",empty:"FFFBFCFD"};
   const bd=()=>({top:{style:'thin',color:{argb:C.line}},left:{style:'thin',color:{argb:C.line}},
     bottom:{style:'thin',color:{argb:C.line}},right:{style:'thin',color:{argb:C.line}}});
   const wb=new ExcelJS.Workbook();
-  const ws=wb.addWorksheet(termLabel+"時間割",{views:[{showGridLines:false}]});
+  const ws=wb.addWorksheet(termName+"時間割",{views:[{showGridLines:false}]});
   ws.getColumn(1).width=12;[2,3,4,5,6].forEach(c=>ws.getColumn(c).width=22);
   let row=1;
   for(const grade of [1,2,3,4]){
     const wlist=(OPT.world_by_grade[String(grade)]||[]).slice().sort((a,b)=>worldRank(a)-worldRank(b));
-    // そのワールドに授業があるものだけ出す（前期は実在ワールドのみ）
+    // そのコースに授業があるものだけ出す（前期は実在コースのみ）
     const activeWorlds=wlist.filter(w=>data.some(r=>r.grade===grade&&r.world===w));
     if(!activeWorlds.length)continue;
     ws.mergeCells(row,1,row,6);const gh=ws.getCell(row,1);
-    gh.value=`2026年度 ${termLabel} 時間割  【${grade}年生】`;
+    gh.value=`${schoolYear}年度 ${termName} 時間割  【${grade}年生】`;
     gh.font={bold:true,size:13,color:{argb:C.ink}};gh.alignment={vertical:'middle'};
     ws.getRow(row).height=24;row++;
     for(const world of activeWorlds){
@@ -2325,7 +3003,7 @@ async function exportClassExcel(which){
   }
   const buf=await wb.xlsx.writeBuffer();
   const blob=new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
-  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`2026年度${termLabel}_THL時間割.xlsx`;a.click();
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`${schoolYear}年度${termName}_${brandFile()}時間割.xlsx`;a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
 function exportJson(){if(!lateRecords.length){alert("後期の授業がまだ登録されていません");return;}
@@ -2432,7 +3110,7 @@ function setTerm(t){term=t;
   document.getElementById("appHeader").classList.toggle("edit-mode",t==="late");
   document.body.classList.toggle("term-late",t==="late");
   setSaved(t==="late"?(lateRecords.length?`後期データ ${lateRecords.length}コマ`:"後期：未入力"):(earlyEditCount()?`前期 編集 ${earlyEditCount()}件`:""));
-  // 名簿は学期共通になったため、選択中の学生はそのまま保つ（在籍していなければ解除）
+  // 名簿は学期共通のため、選択中の学生はそのまま保つ（在籍していなければ解除）
   if(pstate.person&&!personList().some(p=>p.name===pstate.person))pstate.person=null;
   // 前期・後期とも常に編集できるため、モードの切り替えは不要
   rebuildWorldChips();rebuildPersonPick();
@@ -2444,9 +3122,10 @@ document.getElementById("termLate").onclick=()=>setTerm("late");
 
 /* ========== タブ切替 ========== */
 function switchTab(t){document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("on",x.dataset.tab===t));
-  ["class","person","free","slot","room"].forEach(v=>document.getElementById(v+"View").style.display=(v===t)?"":"none");
+  ["class","person","free","slot","room","config"].forEach(v=>{const el=document.getElementById(v+"View");if(el)el.style.display=(v===t)?"":"none";});
   if(t==="class")renderClass();else if(t==="person")renderPerson();else if(t==="free")renderFree();
-  else if(t==="slot")renderSlot();else if(t==="room"){rebuildRoomPick();renderRoom();}}
+  else if(t==="slot")renderSlot();else if(t==="room"){rebuildRoomPick();renderRoom();}
+  else if(t==="config")openConfigTab();}
 document.querySelectorAll(".tab").forEach(tab=>tab.onclick=()=>switchTab(tab.dataset.tab));
 
 /* ========== サーバー同期（Vercel + Upstash Redis） ==========
@@ -2457,13 +3136,16 @@ let serverMode=false;        // サーバーと同期中か
 let serverUpdatedAt=null;    // 最後に読み込んだサーバーデータの更新時刻（競合検出用）
 let pushTimer=null;
 
-/* 旧表記「エアーライン」を新表記「エアライン」へ自動変換する（既存データの移行） */
-const OLD_AIR="エア"+"ーライン";
-function normalizeNotation(){
-  const fix=v=>(v&&v.indexOf&&v.indexOf(OLD_AIR)!==-1)?v.split(OLD_AIR).join("エアライン"):v;
-  [earlyRecords,lateRecords,lateP].forEach(arr=>(arr||[]).forEach(r=>{
-    r.world=fix(r.world);r.room=fix(r.room);r.subject=fix(r.subject);r.teacher=fix(r.teacher);}));
-  (latePersons||[]).forEach(p=>{p.world=fix(p.world);});
+/* 表記ゆれの自動変換は汎用版では使わない（コースはキーで保存されるため不要） */
+function normalizeNotation(){}
+/* 旧バージョンのデータはコースを「正式名称の文字列」で持っている。
+   設定のコース（学年別の正式名称を含む）と照合して、内部キーへ一度だけ変換する。 */
+function migrateWorldKeys(){
+  let n=0;
+  const fix=o=>{if(!o||!o.world)return;const c=courseOf(o.world);
+    if(c&&o.world!==c.key){o.world=c.key;n++;}};
+  (earlyRecords||[]).forEach(fix);(lateRecords||[]).forEach(fix);(latePersons||[]).forEach(fix);
+  return n;
 }
 function renderAll(){
   normalizeNotation();
@@ -2478,10 +3160,10 @@ function openYearMenu(){
 }
 function closeYearMenu(){const ov=document.getElementById("yearMenu");if(ov)ov.classList.remove("show");}
 function ymExport(){
-  const data={year:schoolYear,earlyRecords,lateRecords,latePersons,lateP,earlyP,exportedAt:new Date().toISOString()};
+  const data={year:schoolYear,config:CFG,earlyRecords,lateRecords,latePersons,lateP,earlyP,exportedAt:new Date().toISOString()};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);
-  a.download="THL時間割_"+schoolYear+"年度_"+new Date().toLocaleDateString("ja-JP").replace(/\//g,"")+".json";a.click();
+  a.download=brandFile()+"時間割_"+schoolYear+"年度_"+new Date().toLocaleDateString("ja-JP").replace(/\//g,"")+".json";a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
 function ymNewYear(copy){
@@ -2501,7 +3183,7 @@ function ymNewYear(copy){
   schoolYear=next;saveYearLocal();
   // ローカル保存
   try{
-    localStorage.setItem("thl_zenki_records_v1",JSON.stringify(earlyRecords));
+    localStorage.setItem("tt_zenki_records_v1",JSON.stringify(earlyRecords));
     localStorage.setItem(STORE_KEY,JSON.stringify(lateRecords));
     localStorage.setItem(STORE_PKEY,JSON.stringify(latePersons));
     localStorage.setItem(STORE_PREC,JSON.stringify(lateP));
@@ -2527,7 +3209,7 @@ function ymImport(){
         lateP=Array.isArray(d.lateP)?d.lateP:[];
     earlyP=Array.isArray(d.earlyP)?d.earlyP:[];
         try{
-          localStorage.setItem("thl_zenki_records_v1",JSON.stringify(earlyRecords));
+          localStorage.setItem("tt_zenki_records_v1",JSON.stringify(earlyRecords));
           localStorage.setItem(STORE_KEY,JSON.stringify(lateRecords));
           localStorage.setItem(STORE_PKEY,JSON.stringify(latePersons));
           localStorage.setItem(STORE_PREC,JSON.stringify(lateP));
@@ -2568,8 +3250,8 @@ async function serverLoad(silent){
     let url=API_URL;const opts={cache:"no-store"};
     if(!VIEWER_MODE){
       // 編集画面：学生データを含む全データの取得にパスワードが必要
-      let tok=null;try{tok=sessionStorage.getItem("thl_edit_token");}catch(e){}
-      if(tok&&!validEditToken(tok)){tok=null;try{sessionStorage.removeItem("thl_edit_token");}catch(e){}}
+      let tok=null;try{tok=sessionStorage.getItem("tt_edit_token");}catch(e){}
+      if(tok&&!validEditToken(tok)){tok=null;try{sessionStorage.removeItem("tt_edit_token");}catch(e){}}
       if(!tok){serverMode=false;showEditGate("");return;} // 入口ゲートで入力を待つ
       opts.headers={"x-edit-token":tok};
     }else if(VIEWER_STUDENT_KEY){
@@ -2578,7 +3260,7 @@ async function serverLoad(silent){
     const r=await fetch(url,opts);
     if(r.status===401){
       let ts=null;try{const b=await r.json();ts=b?b.tokenSet:null;}catch(e2){}
-      try{sessionStorage.removeItem("thl_edit_token");}catch(e){}
+      try{sessionStorage.removeItem("tt_edit_token");}catch(e){}
       serverMode=false;
       if(ts===false){
         setSaved("⚠ サーバー同期オフ（EDIT_TOKEN未設定）");
@@ -2600,6 +3282,13 @@ async function serverLoad(silent){
     hideSyncWarn();hideEditGate();
     const btn=document.getElementById("syncReloadBtn");if(btn){btn.style.display="";btn.onclick=()=>serverLoad(false);}
     if(j&&j.exists){
+      // サーバーに保存された設定（学校名・コース・教室など）を反映する
+      if(j.config&&typeof j.config==="object"){CFG=Object.assign(defaultCFG(),j.config);saveCfgLocal();}
+      applyCFG();applyBranding();rebuildFromCFG();setupTabVisibility();
+      if(!CFG.configured){
+        if(VIEWER_MODE){showNotConfiguredNotice();return;}
+        openSetupIfNeeded();
+      }
       // 年度付き閲覧URLの照合：閲覧モードで、?y= が無い（素のURL）か、現年度と違う年度なら案内を出して中身を見せない。
       // 学生URL（?s=）は年度非依存のため対象外。編集画面（/edit）は VIEWER_MODE=false なので影響しない。
       if(VIEWER_MODE&&!VIEWER_STUDENT_KEY&&typeof j.year==="number"&&VIEWER_YEAR!==j.year){
@@ -2610,6 +3299,10 @@ async function serverLoad(silent){
       earlyEdits=j.earlyEdits||{};
       if(typeof j.year==="number"){schoolYear=j.year;saveYearLocal();}
       latePersons=j.latePersons||[];lateP=j.lateP||[];earlyP=j.earlyP||[];
+      // 旧形式のデータ（コースが正式名称の文字列）をキーへ変換する。初回の読み込み時だけ動く
+      try{const mg=migrateWorldKeys();
+        if(mg>0&&!VIEWER_MODE){saveEarlyEdits();saveLate();saveLateP();}
+      }catch(e){}
       serverUpdatedAt=j.updatedAt||null;
       updateYearBadge();
       // 編集画面：キー未発行の学生がいれば発行してサーバーに反映
@@ -2617,7 +3310,7 @@ async function serverLoad(silent){
       // ローカルにもキャッシュ（オフライン時の保険。閲覧版はキャッシュしない）
       if(!VIEWER_MODE){try{
         localStorage.setItem(STORE_KEY,JSON.stringify(lateRecords));
-        localStorage.setItem("thl_zenki_records_v1",JSON.stringify(earlyRecords));
+        localStorage.setItem("tt_zenki_records_v1",JSON.stringify(earlyRecords));
         localStorage.setItem(STORE_PKEY,JSON.stringify(latePersons));
         localStorage.setItem(STORE_PREC,JSON.stringify(lateP));
       }catch(e){}}
@@ -2646,7 +3339,7 @@ function showYearNotice(reqYear){
   if(!el){
     el=document.createElement("div");el.id="yearNotice";
     el.innerHTML='<div class="yn-card">'+
-      '<div class="yn-badge">THL</div>'+
+      '<div class="yn-badge" id="ynBadge"></div>'+
       '<div class="yn-title">この時間割は現在ご利用いただけません</div>'+
       '<div class="yn-msg" id="ynMsg"></div>'+
       '<div class="yn-sub">最新の時間割をご覧になりたい在校生の方は、今年度のURLまたはQRコードを学校からの案内でご確認ください。</div>'+
@@ -2662,7 +3355,7 @@ function showYearNotice(reqYear){
   Array.prototype.forEach.call(document.body.children,function(ch){
     if(ch.id!=="yearNotice")ch.style.display="none";
   });
-  document.title="THL 時間割ツール";
+  document.title=(CFG.schoolShort||CFG.schoolName||"")+" 時間割ツール";
 }
 /* 編集画面の未接続警告バナー */
 function showSyncWarn(msg){
@@ -2671,7 +3364,7 @@ function showSyncWarn(msg){
   document.getElementById("syncWarnMsg").textContent=msg;
   w.style.display="";
   const b=document.getElementById("syncRetryBtn");
-  if(b)b.onclick=()=>{try{sessionStorage.removeItem("thl_edit_token");}catch(e){};serverLoad(false);};
+  if(b)b.onclick=()=>{try{sessionStorage.removeItem("tt_edit_token");}catch(e){};serverLoad(false);};
 }
 function hideSyncWarn(){const w=document.getElementById("syncWarn");if(w)w.style.display="none";}
 /* 編集画面の入口ゲート：正しいパスワードを入れるまで編集画面に入れない */
@@ -2689,7 +3382,7 @@ function gateSubmit(){
   const i=document.getElementById("gatePw");const v=(i&&i.value||"").trim();
   if(!v){showEditGate("パスワードを入力してください。");return;}
   if(!validEditToken(v)){showEditGate("全角文字が含まれています。IMEをオフにして、半角英数字・記号で入力してください。");return;}
-  try{sessionStorage.setItem("thl_edit_token",v);}catch(e){}
+  try{sessionStorage.setItem("tt_edit_token",v);}catch(e){}
   serverLoad(false);
 }
 /* 閲覧版：学生キーの結果に応じて学生別タブを出し分ける */
@@ -2720,18 +3413,18 @@ function schedulePush(){
 async function doPush(){
   if(!serverMode)return;
   let tok=null;
-  try{tok=sessionStorage.getItem("thl_edit_token");}catch(e){}
-  if(tok&&!validEditToken(tok)){tok=null;try{sessionStorage.removeItem("thl_edit_token");}catch(e){}}
+  try{tok=sessionStorage.getItem("tt_edit_token");}catch(e){}
+  if(tok&&!validEditToken(tok)){tok=null;try{sessionStorage.removeItem("tt_edit_token");}catch(e){}}
   if(!tok){setSaved("⚠ サーバー未保存（未認証）");
     showEditGate("編集内容を保存するには、パスワードを入力してください。");return;}
   try{
-    const body={year:schoolYear,lateRecords,earlyRecords,latePersons,lateP,earlyP,baseUpdatedAt:serverUpdatedAt};
+    const body={year:schoolYear,config:CFG,lateRecords,earlyRecords,latePersons,lateP,earlyP,baseUpdatedAt:serverUpdatedAt};
     const r=await fetch(API_URL,{method:"PUT",
       headers:{"Content-Type":"application/json","x-edit-token":tok},
       body:JSON.stringify(body)});
     if(r.status===401){
       let ts=null;try{const b=await r.json();ts=b?b.tokenSet:null;}catch(e2){}
-      try{sessionStorage.removeItem("thl_edit_token");}catch(e){}
+      try{sessionStorage.removeItem("tt_edit_token");}catch(e){}
       if(ts===false){
         setSaved("⚠ サーバー未保存（EDIT_TOKEN未設定）");
         showEditGate("サーバー側にEDIT_TOKENが設定されていません。Vercelの環境変数を確認してください。（直前の変更は保存されていません）");
@@ -2758,13 +3451,13 @@ async function doPush(){
 (function(){
   if(VIEWER_MODE){
     const tag=document.getElementById("viewerTag");if(tag)tag.style.display="";
-    document.title="THL 時間割（閲覧版）";
-    const h1=document.querySelector("#appHeader h1");if(h1)h1.textContent="THL 時間割（閲覧版）";
+    document.title=(CFG.schoolShort||CFG.schoolName||"")+" 時間割（閲覧版）";
+    applyBranding();
     // 学生別タブは初期非表示。有効な学生用URL（?s=）のときだけserverLoad後に表示される
     const pt=document.querySelector('.tab[data-tab="person"]');if(pt)pt.style.display="none";
-    // ワールド用URL：最初からそのワールド（と学年）を選択した状態にする
-    if(VIEWER_WORLD){cstate.world=VIEWER_WORLD;if(VIEWER_GRADE)cstate.grade=VIEWER_GRADE;
-      try{refreshChips("#classView",cstate);}catch(e){}}
+    // コース用URL：最初からそのコース（と学年）を選択した状態にする
+    if(VIEWER_WORLD){cstate.world=VIEWER_WORLD;if(VIEWER_GRADE)cstate.grade=VIEWER_GRADE;}
+      /* 表示名への解決は設定の読み込み後に applyViewerSelection() で行う */
   }else if(location.protocol!=="file:"){
     // 編集画面：入口ゲートの配線（Enterキーでも送信）
     const b=document.getElementById("gateBtn");if(b)b.onclick=gateSubmit;
@@ -2773,12 +3466,14 @@ async function doPush(){
 })();
 
 /* ========== 初期化 ========== */
-rebuildWorldChips();rebuildPersonPick();
-rebuildRoomPick();
+loadCfgLocal();            // 端末に残っている設定（オフライン時の保険）
+applyCFG();applyBranding();
+rebuildFromCFG();
 updateYearBadge();
-normalizeNotation(); // ローカルに残る旧表記データを新表記へ
 renderClass();renderPerson();renderFree();renderSlot();renderRoom();
-serverLoad(true); // サーバーがあれば共有データを読み込む（無ければローカルのまま）
+setupTabVisibility();      // 設定タブは編集画面だけに出す
+serverLoad(true);          // サーバーがあれば共有の設定・データを読み込む
+if(location.protocol==="file:")openSetupIfNeeded(); // ファイル直接開きは即セットアップ
 </script>
 </body>
 </html>
