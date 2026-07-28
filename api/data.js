@@ -69,12 +69,13 @@ export default async function handler(req, res) {
         if (!stu) {
           return res
             .status(200)
-            .json({ ...base, latePersons: [], lateP: [], student: false });
+            .json({ ...base, latePersons: [], lateP: [], earlyP: [], student: false });
         }
         return res.status(200).json({
           ...base,
           latePersons: [stu],
           lateP: (data.lateP || []).filter((r) => r && r.person === stu.name),
+          earlyP: (data.earlyP || []).filter((r) => r && r.person === stu.name),
           student: true,
         });
       }
@@ -82,7 +83,7 @@ export default async function handler(req, res) {
       // 3) 公開（キー無し）→ クラス時間割のみ。学生データは返さない
       return res
         .status(200)
-        .json({ ...base, latePersons: [], lateP: [], studentsHidden: true });
+        .json({ ...base, latePersons: [], lateP: [], earlyP: [], studentsHidden: true });
     }
 
     if (req.method === "PUT") {
@@ -119,6 +120,7 @@ export default async function handler(req, res) {
             : {},
         latePersons: Array.isArray(body.latePersons) ? body.latePersons : [],
         lateP: Array.isArray(body.lateP) ? body.lateP : [],
+        earlyP: Array.isArray(body.earlyP) ? body.earlyP : [],
         updatedAt,
       };
       await kv(["SET", KEY, JSON.stringify(data)]);
