@@ -1858,11 +1858,18 @@ function renderEditToolbar(){
       <button class="btn ok" id="exportEarlyXlsx">Excel出力</button>
       <button class="btn ghost" id="yearMenuBtnE">年度メニュー</button>
       <button class="btn ghost" id="worldUrlBtnE">コースURL一覧</button>
+      <button class="btn danger-ghost" id="resetEarly">${esc(termLabel("early"))}データを消去</button>
     </div><div id="progressPanel"></div><div id="checkPanel"></div>`;
     document.getElementById("exportEarlyXlsx").onclick=exportEarlyExcel;
     document.getElementById("checkAll").onclick=()=>{checkOpen=!checkOpen;if(checkOpen)progressOpen=false;renderProgress();renderCheck();};
     const ym=document.getElementById("yearMenuBtnE");if(ym)ym.onclick=openYearMenu;
     const wu=document.getElementById("worldUrlBtnE");if(wu)wu.onclick=exportWorldUrls;
+    const re_=document.getElementById("resetEarly");
+    if(re_)re_.onclick=()=>{
+      const t=termLabel("early");
+      if(confirm(t+"に登録したデータをすべて消去します。\n（学生別の個別時間割は消えません）\n\nこの操作は元に戻せません。よろしいですか？")){
+        earlyRecords=[];saveEarlyEdits();renderClass();
+        setSaved(t+"データを消去しました");}};
     renderCheck();
     return;
   }
@@ -1877,12 +1884,15 @@ function renderEditToolbar(){
     <button class="btn ghost" id="importJson">JSON読込</button>
     <button class="btn ghost" id="yearMenuBtnL">年度メニュー</button>
     <button class="btn ghost" id="worldUrlBtnL">コースURL一覧</button>
-    <button class="btn danger-ghost" id="resetLate">後期データを消去</button>
+    <button class="btn danger-ghost" id="resetLate">${esc(termLabel("late"))}データを消去</button>
   </div><div id="progressPanel"></div><div id="checkPanel"></div>`;
   document.getElementById("exportXlsx").onclick=exportExcel;
   document.getElementById("exportJson").onclick=exportJson;
   document.getElementById("importJson").onclick=importClassJson;
-  document.getElementById("resetLate").onclick=()=>{if(confirm("後期に登録したデータをすべて消去します。よろしいですか？")){lateRecords=[];saveLate();renderClass();}};
+  document.getElementById("resetLate").onclick=()=>{
+    const t=termLabel("late");
+    if(confirm(t+"に登録したデータをすべて消去します。\n（学生別の個別時間割は消えません）\n\nこの操作は元に戻せません。よろしいですか？")){
+      lateRecords=[];saveLate();renderClass();setSaved(t+"データを消去しました");}};
   const ymL=document.getElementById("yearMenuBtnL");if(ymL)ymL.onclick=openYearMenu;
   const wuL=document.getElementById("worldUrlBtnL");if(wuL)wuL.onclick=exportWorldUrls;
   document.getElementById("toggleProgress").onclick=()=>{progressOpen=!progressOpen;if(progressOpen)checkOpen=false;renderProgress();renderCheck();};
