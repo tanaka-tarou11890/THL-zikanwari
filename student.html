@@ -467,6 +467,12 @@
     .edit-toolbar .btn{min-width:100%}
     table.week{min-width:500px}
   }
+  #yearNotice{display:none;position:fixed;inset:0;z-index:9999;background:linear-gradient(160deg,#1E5B3C 0%,#134129 100%);align-items:center;justify-content:center;padding:24px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #yearNotice .yn-card{max-width:440px;width:100%;background:#fff;border-radius:18px;padding:40px 32px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+  #yearNotice .yn-badge{font-family:"Cinzel",serif;font-weight:700;letter-spacing:.35em;color:#1E5B3C;font-size:1.1rem;margin-bottom:20px}
+  #yearNotice .yn-title{font-size:1.25rem;font-weight:800;color:#16323F;line-height:1.5;margin-bottom:16px}
+  #yearNotice .yn-msg{font-size:1rem;line-height:1.8;color:#1E5B3C;font-weight:600;margin-bottom:16px}
+  #yearNotice .yn-sub{font-size:.85rem;line-height:1.8;color:#5A6B7A}
 </style>
 </head>
 <body>
@@ -480,7 +486,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v26</span>
+  <span class="app-ver">v27</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
@@ -1135,18 +1141,13 @@ let worldGroups=[];
 function rebuildWorldChips(){
   // 前期は実在ワールド、後期は学年別の全ワールド（空でも編集できるように）
   // 学年が選択されていればその学年のワールドのみ表示
+  // 前期・後期とも、その学年に設定されている全ワールドを表示する
+  // （データが空でも選べるようにして、前期・後期それぞれ独立に時間割を組めるようにする）
   let ws;
   if(cstate.grade){
     ws=(OPT.world_by_grade[String(cstate.grade)]||[]).slice();
-    if(!isLate()){
-      // 前期は実データに存在するものだけ
-      const exist=new Set(classData().filter(r=>r.grade===cstate.grade).map(r=>r.world));
-      ws=ws.filter(w=>exist.has(w));
-    }
-  }else if(isLate()){
-    const all=new Set();Object.values(OPT.world_by_grade).forEach(arr=>arr.forEach(w=>all.add(w)));ws=[...all];
   }else{
-    ws=[...new Set(classData().map(r=>r.world))];
+    const all=new Set();Object.values(OPT.world_by_grade).forEach(arr=>arr.forEach(w=>all.add(w)));ws=[...all];
   }
   worldGroups=[...new Set(ws.map(worldShortFull))];
   worldGroups.sort((a,b)=>{
@@ -1491,12 +1492,6 @@ function printTimetable(kind){
       background:${btnColor};color:#fff;cursor:pointer;margin:0 5px;font-family:inherit}
     .noprint button.sec{background:#fff;color:${btnColor};border:1.5px solid ${btnColor}}
     @media print{body{padding:0}.noprint{display:none}.table-scroll{box-shadow:none}}
-  #yearNotice{display:none;position:fixed;inset:0;z-index:9999;background:linear-gradient(160deg,#1E5B3C 0%,#134129 100%);align-items:center;justify-content:center;padding:24px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  #yearNotice .yn-card{max-width:440px;width:100%;background:#fff;border-radius:18px;padding:40px 32px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.25)}
-  #yearNotice .yn-badge{font-family:"Cinzel",serif;font-weight:700;letter-spacing:.35em;color:#1E5B3C;font-size:1.1rem;margin-bottom:20px}
-  #yearNotice .yn-title{font-size:1.25rem;font-weight:800;color:#16323F;line-height:1.5;margin-bottom:16px}
-  #yearNotice .yn-msg{font-size:1rem;line-height:1.8;color:#1E5B3C;font-weight:600;margin-bottom:16px}
-  #yearNotice .yn-sub{font-size:.85rem;line-height:1.8;color:#5A6B7A}
   </style></head><body>
   <div class="noprint"><button onclick="window.print()">印刷する</button><button class="sec" onclick="window.close()">閉じる</button></div>
   ${sheets}</body></html>`);
@@ -1895,20 +1890,25 @@ document.getElementById("mDelete").onclick=()=>{
 const pstate={q:"",person:null};
 const STORE_PKEY="thl_kouki_persons_v1";
 const STORE_PREC="thl_kouki_personrecs_v1";
-let latePersons=[],lateP=[];
+const STORE_PREC_E="thl_zenki_personrecs_v1";
+/* 学生の名簿（latePersons）は前期・後期で共通。個別の時間割は学期ごとに持つ（earlyP / lateP）。 */
+let latePersons=[],lateP=[],earlyP=[];
 function loadLateP(){try{const a=localStorage.getItem(STORE_PKEY);if(a)latePersons=JSON.parse(a);
-  const b=localStorage.getItem(STORE_PREC);if(b)lateP=JSON.parse(b);}catch(e){latePersons=[];lateP=[];}}
+  const b=localStorage.getItem(STORE_PREC);if(b)lateP=JSON.parse(b);
+  const c=localStorage.getItem(STORE_PREC_E);if(c)earlyP=JSON.parse(c);}catch(e){latePersons=[];lateP=[];earlyP=[];}}
 function saveLateP(){
   if(!VIEWER_MODE)ensureStudentKeys(); // 学生キーの自動発行（追加・読込のどの経路でも）
   try{localStorage.setItem(STORE_PKEY,JSON.stringify(latePersons));
-  localStorage.setItem(STORE_PREC,JSON.stringify(lateP));}catch(e){}
+  localStorage.setItem(STORE_PREC,JSON.stringify(lateP));
+  localStorage.setItem(STORE_PREC_E,JSON.stringify(earlyP));}catch(e){}
   schedulePush();}
 loadLateP();
-function personRecords(){return isLate()?lateP:PER;}
+/* 表示中の学期の個別時間割 */
+function personRecords(){return isLate()?lateP:earlyP;}
+function setPersonRecords(a){if(isLate())lateP=a;else earlyP=a;}
 function personList(){
   let list;
-  if(isLate())list=latePersons.slice().sort((a,b)=>a.grade-b.grade||a.name.localeCompare(b.name,"ja"));
-  else list=[...new Set(PER.map(r=>r.person))].map(name=>({name,grade:PER.find(r=>r.person===name).grade})).sort((a,b)=>a.grade-b.grade||a.name.localeCompare(b.name,"ja"));
+  list=latePersons.slice().sort((a,b)=>a.grade-b.grade||a.name.localeCompare(b.name,"ja"));
   // 閲覧版の学生用URL：本人だけに制限（後期はサーバーが本人のみ返すが、前期の埋め込みデータも同名のみに絞る）
   if(VIEWER_MODE&&VIEWER_STUDENT_KEY){
     const allowed=new Set((latePersons||[]).map(p=>p.name));
@@ -1983,7 +1983,7 @@ function renderPersonToolbar(){
   document.getElementById("exportPJson").onclick=exportPersonJson;
   document.getElementById("importPJson").onclick=importPersonJson;
   document.getElementById("printPersonAll").onclick=()=>{if(!latePersons.length){alert("学生が登録されていません");return;}printTimetable("person-all");};
-  document.getElementById("resetLateP").onclick=()=>{if(confirm("後期の学生別データ（学生と時間割）をすべて消去します。よろしいですか？")){latePersons=[];lateP=[];saveLateP();pstate.person=null;rebuildPersonPick();renderPerson();}};
+  document.getElementById("resetLateP").onclick=()=>{if(confirm("学生別データ（学生の名簿と、前期・後期の個別時間割）をすべて消去します。よろしいですか？")){latePersons=[];lateP=[];earlyP=[];saveLateP();pstate.person=null;rebuildPersonPick();renderPerson();}};
 }
 function renderPerson(){const q=normQ(pstate.q).trim();
   renderPersonToolbar();
@@ -2049,13 +2049,13 @@ function openStudentModal(name){
     if(!name&&latePersons.some(x=>x.name===nm)){alert("同じ氏名の学生が既にいます");return;}
     if(name){
       const old=latePersons.find(x=>x.name===name);
-      if(nm!==name)lateP.forEach(r=>{if(r.person===name)r.person=nm;});
+      if(nm!==name)[lateP,earlyP].forEach(arr=>arr.forEach(r=>{if(r.person===name)r.person=nm;}));
       old.name=nm;old.grade=selGrade;old.world=selWorld;pstate.person=nm;
     }else{
       latePersons.push({name:nm,grade:selGrade,world:selWorld});
       if(selWorld){
-        lateRecords.filter(r=>r.grade===selGrade&&r.world===selWorld).forEach(r=>{
-          lateP.push({person:nm,grade:selGrade,day:r.day,period:r.period,time:r.time,subject:r.subject,teacher:r.teacher,room:r.room,note:r.note||""});
+        classData().filter(r=>r.grade===selGrade&&r.world===selWorld).forEach(r=>{
+          personRecords().push({person:nm,grade:selGrade,day:r.day,period:r.period,time:r.time,subject:r.subject,teacher:r.teacher,room:r.room,note:r.note||""});
         });
       }
       pstate.person=nm;
@@ -2064,7 +2064,7 @@ function openStudentModal(name){
   };
   document.getElementById("spDelete").onclick=()=>{
     if(!confirm(`${name} さんと、その時間割データを削除します。よろしいですか？`))return;
-    latePersons=latePersons.filter(x=>x.name!==name);lateP=lateP.filter(r=>r.person!==name);
+    latePersons=latePersons.filter(x=>x.name!==name);lateP=lateP.filter(r=>r.person!==name);earlyP=earlyP.filter(r=>r.person!==name);
     if(pstate.person===name)pstate.person=null;
     saveLateP();rebuildPersonPick();renderPerson();closeStudentModal();
   };
@@ -2102,10 +2102,10 @@ document.getElementById("pcSave").onclick=()=>{
   const data={person:pstate.person,grade:pinfo.grade,day,period,time:PTIME_FULL[period],
     subject:subj,teacher:document.getElementById("pcTeacher").value.trim(),
     room:document.getElementById("pcRoom").value.trim(),note:document.getElementById("pcNote").value.trim()};
-  if(r)Object.assign(r,data);else lateP.push(data);
+  if(r)Object.assign(r,data);else personRecords().push(data);
   saveLateP();renderPerson();closePersonCell();};
 document.getElementById("pcDelete").onclick=()=>{const {day,period}=editingPC;
-  lateP=lateP.filter(r=>!(r.person===pstate.person&&r.day===day&&r.period===period));
+  setPersonRecords(personRecords().filter(r=>!(r.person===pstate.person&&r.day===day&&r.period===period)));
   saveLateP();renderPerson();closePersonCell();};
 
 /* 学生別 Excel / JSON 出力 */
@@ -2407,7 +2407,7 @@ function importPersonJson(){
     }
     if(mode==="replace"){
       latePersons=students.map(s=>({name:String(s.name),grade:+s.grade,world:s.world||null}));
-      lateP=recs.map(normPersonRec);
+      setPersonRecords(recs.map(normPersonRec));
     }else{
       // 学生：氏名キーで上書き
       const smap={};latePersons.forEach(s=>{smap[s.name]=s;});
@@ -2415,7 +2415,7 @@ function importPersonJson(){
       latePersons=Object.values(smap);
       // レコード：person|day|period キーで上書き。読み込んだ学生のレコードは一旦全消し→入れ直し
       const importedNames=new Set(students.map(s=>String(s.name)));
-      lateP=lateP.filter(r=>!importedNames.has(r.person)).concat(recs.map(normPersonRec));
+      setPersonRecords(personRecords().filter(r=>!importedNames.has(r.person)).concat(recs.map(normPersonRec)));
     }
     saveLateP();
     pstate.person=null;rebuildPersonPick();renderPerson();
@@ -2433,8 +2433,8 @@ function setTerm(t){term=t;
   document.getElementById("appHeader").classList.toggle("edit-mode",t==="late");
   document.body.classList.toggle("term-late",t==="late");
   setSaved(t==="late"?(lateRecords.length?`後期データ ${lateRecords.length}コマ`:"後期：未入力"):(earlyEditCount()?`前期 編集 ${earlyEditCount()}件`:""));
-  // 学期で学生別データの母集合が変わるため、選択中の学生はリセット
-  pstate.person=null;
+  // 名簿は学期共通になったため、選択中の学生はそのまま保つ（在籍していなければ解除）
+  if(pstate.person&&!personList().some(p=>p.name===pstate.person))pstate.person=null;
   earlyEditMode=false; // 学期を切り替えたら前期編集モードはオフに戻す
   rebuildWorldChips();rebuildPersonPick();
   rstate.room=null;
@@ -2479,7 +2479,7 @@ function openYearMenu(){
 }
 function closeYearMenu(){const ov=document.getElementById("yearMenu");if(ov)ov.classList.remove("show");}
 function ymExport(){
-  const data={year:schoolYear,earlyRecords,lateRecords,latePersons,lateP,exportedAt:new Date().toISOString()};
+  const data={year:schoolYear,earlyRecords,lateRecords,latePersons,lateP,earlyP,exportedAt:new Date().toISOString()};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);
   a.download="THL時間割_"+schoolYear+"年度_"+new Date().toLocaleDateString("ja-JP").replace(/\//g,"")+".json";a.click();
@@ -2498,7 +2498,7 @@ function ymNewYear(copy){
   }else{
     earlyRecords=[];lateRecords=[];
   }
-  latePersons=[];lateP=[];
+  latePersons=[];lateP=[];earlyP=[];   // 学生別は引き継がず、新年度で登録し直す
   schoolYear=next;saveYearLocal();
   // ローカル保存
   try{
@@ -2506,6 +2506,7 @@ function ymNewYear(copy){
     localStorage.setItem(STORE_KEY,JSON.stringify(lateRecords));
     localStorage.setItem(STORE_PKEY,JSON.stringify(latePersons));
     localStorage.setItem(STORE_PREC,JSON.stringify(lateP));
+    localStorage.setItem(STORE_PREC_E,JSON.stringify(earlyP));
   }catch(e){}
   updateYearBadge();renderAll();closeYearMenu();
   schedulePush(); // サーバーへ反映
@@ -2525,6 +2526,7 @@ function ymImport(){
         lateRecords=Array.isArray(d.lateRecords)?d.lateRecords:[];
         latePersons=Array.isArray(d.latePersons)?d.latePersons:[];
         lateP=Array.isArray(d.lateP)?d.lateP:[];
+    earlyP=Array.isArray(d.earlyP)?d.earlyP:[];
         try{
           localStorage.setItem("thl_zenki_records_v1",JSON.stringify(earlyRecords));
           localStorage.setItem(STORE_KEY,JSON.stringify(lateRecords));
@@ -2608,7 +2610,7 @@ async function serverLoad(silent){
       if(Array.isArray(j.earlyRecords))earlyRecords=j.earlyRecords; // 前期もサーバー管理
       earlyEdits=j.earlyEdits||{};
       if(typeof j.year==="number"){schoolYear=j.year;saveYearLocal();}
-      latePersons=j.latePersons||[];lateP=j.lateP||[];
+      latePersons=j.latePersons||[];lateP=j.lateP||[];earlyP=j.earlyP||[];
       serverUpdatedAt=j.updatedAt||null;
       updateYearBadge();
       // 編集画面：キー未発行の学生がいれば発行してサーバーに反映
@@ -2724,7 +2726,7 @@ async function doPush(){
   if(!tok){setSaved("⚠ サーバー未保存（未認証）");
     showEditGate("編集内容を保存するには、パスワードを入力してください。");return;}
   try{
-    const body={year:schoolYear,lateRecords,earlyRecords,latePersons,lateP,baseUpdatedAt:serverUpdatedAt};
+    const body={year:schoolYear,lateRecords,earlyRecords,latePersons,lateP,earlyP,baseUpdatedAt:serverUpdatedAt};
     const r=await fetch(API_URL,{method:"PUT",
       headers:{"Content-Type":"application/json","x-edit-token":tok},
       body:JSON.stringify(body)});
