@@ -587,6 +587,8 @@
     .ff-row{grid-template-columns:1fr;gap:16px}
   }
   /* 年度案内・準備中の全画面表示 */
+  .pub-badge{display:inline-flex;align-items:center;gap:5px;background:#F5A623;color:#3D2B00;
+    font-size:.74rem;font-weight:800;padding:4px 10px;border-radius:12px;letter-spacing:.02em;white-space:nowrap}
   #yearNotice{display:none;position:fixed;inset:0;z-index:9999;background:linear-gradient(160deg,#1E5B3C 0%,#134129 100%);align-items:center;justify-content:center;padding:24px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   #yearNotice .yn-card{max-width:440px;width:100%;background:#fff;border-radius:18px;padding:40px 32px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.25)}
   #yearNotice .yn-badge{font-family:"Cinzel",serif;font-weight:700;letter-spacing:.35em;color:#1E5B3C;font-size:1.1rem;margin-bottom:20px}
@@ -612,10 +614,11 @@
     <button id="termEarly" class="on">前期</button>
     <button id="termLate">後期</button>
   </div>
+  <span class="pub-badge" id="pubBadge" style="display:none"></span>
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v29</span>
+  <span class="app-ver">v30</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
@@ -895,6 +898,30 @@ const GEN=[];  // 前期の初期データは持たない（設定後に編集�
 const PER=[];  // 学生別の初期データも持たない
 function defaultCFG(){return {"schoolName": "東京ホテル・観光＆ホスピタリティ専門学校", "schoolShort": "THL", "gradeCount": 4, "days": ["月", "火", "水", "木", "金"], "periods": [{"n": 1, "start": "09:00", "end": "10:30"}, {"n": 2, "start": "10:40", "end": "12:10"}, {"n": 3, "start": "13:00", "end": "14:30"}, {"n": 4, "start": "14:40", "end": "16:10"}, {"n": 5, "start": "16:20", "end": "17:50"}], "courses": [{"key": "hotel", "short": "ホテル", "full": "ホテルワールド（3年制・4年制）", "color": "#1E5B3C", "urlKey": "hotel", "grades": [1, 2, 3, 4], "fullByGrade": {"1": "ホテルワールド（3年制・4年制）", "2": "ホテルワールド（3年制・4年制）", "3": "ホテルワールド（3年制・4年制）", "4": "ホテルワールド（4年制）"}}, {"key": "tour", "short": "観光", "full": "観光ワールド（4年制）", "color": "#F5C826", "urlKey": "tour", "grades": [1, 2, 3, 4], "fullByGrade": null}, {"key": "air", "short": "エアライン", "full": "エアラインワールド（3年制・4年制）", "color": "#8ED2EC", "urlKey": "air", "grades": [1, 2, 3, 4], "fullByGrade": {"1": "エアラインワールド（3年制・4年制）", "2": "エアラインワールド（3年制・4年制）", "3": "エアラインワールド（4年制）", "4": "エアラインワールド（4年制）"}}, {"key": "dress", "short": "ブライダル(ドレス)", "full": "ブライダルワールド【ドレスコーディネーターコース】（3年制）", "color": "#F4B4CC", "urlKey": "dress", "grades": [1, 2, 3], "fullByGrade": null}, {"key": "planner", "short": "ブライダル(プランナー)", "full": "ブライダルワールド【プランナーコース】（3年制）", "color": "#EFA0BE", "urlKey": "planner", "grades": [1, 2, 3], "fullByGrade": null}], "rooms": [{"name": "302", "special": false}, {"name": "303", "special": false}, {"name": "401", "special": false}, {"name": "402", "special": false}, {"name": "403・4", "special": false}, {"name": "501", "special": false}, {"name": "502", "special": false}, {"name": "503", "special": false}, {"name": "504", "special": false}, {"name": "601", "special": false}, {"name": "1Fカフェ", "special": true}, {"name": "エアラインルーム", "special": true}, {"name": "ゲストルーム", "special": true}, {"name": "ゲーミングルーム", "special": true}, {"name": "ドレスルーム", "special": true}, {"name": "バンケットルーム", "special": true}, {"name": "ビューティールーム", "special": true}], "subjects": ["AIリテラシー", "AIリテラシー基礎と生成AIの実践活用", "BIA対策講座（2級）", "BIA対策講座（3級）", "IT基礎知識", "IT基礎知識Ⅰ", "JALキャリアプログラム", "ONSENガストロノミーⅠ", "ONSENガストロノミーⅡ", "SNSプロモーション", "SPI対策", "Self Development", "TOEIC", "WEBデザイン", "※マネジメントゼミ未選択者は、\n「ゲーミング」の選択授業が受講可能です。", "【GSのみ】就職対策基礎", "アルコールの基礎", "アルコールの知識", "イベント企画", "イベント企画Ⅱ", "インバウンドビジネス論", "エアラインマナー", "カメラワーク", "キャリアデザイン", "キャリアプログラム", "キャリアプログラムⅠ", "キャリアプログラムⅡ", "ゲーミング", "コンシェルジュゼミ", "コーヒーの基礎知識", "サービストレーニング", "サービス基礎", "サービス基礎（A）", "サービス基礎（B）", "セルフアップビューティー", "セルフケア", "セルフディスカバリー", "セルフマネジメントⅠ", "セルフメイク", "チームビルディング", "ツアー企画", "テーブルコーディネート", "デジタルマーケティング", "トラベルマーケティング", "ドレススタイリング", "ドレスメンテナンス", "バー・ラウンジサービス", "パーソナルカラー", "ビジネス英会話Ⅱ", "フラワーコーディネート", "ブライダルの演出", "ブライダルビジネスⅠ", "ブライダルビジネスⅠ／映像編集", "ブライダルビジョン", "ブライダルフェア", "ブライダルプランニングⅡ", "ブライダル基礎", "ヘアメイク＆スタイリング", "ホスピタリティコミュニケーション", "ホテルビジネス", "ホテル接客基礎", "ホテル開発演習", "マネジメントゼミ", "マネジメント入門Ⅰ", "ヨガ", "レストランゼミ", "世界遺産観光概論", "中国語", "企業プロジェクト", "会計学", "動画撮影・編集", "卒業研究", "和装着付け実習", "地域コンシェルジュ", "宿泊入門", "就活対策講座", "就職対策Ⅰ", "就職対策Ⅱ", "就職対策Ⅲ", "就職対策Ⅳ", "店舗接客Ⅱ", "店舗接客Ⅲ", "成長学・ストレスマネジメント", "手話", "接客シミュレーション", "旅行業実践学", "日本の伝統文化", "映像編集", "時事研究", "服飾史", "業界研究", "業界研究Ⅲ", "滋慶選択", "異文化交流", "異文化理解", "航空業界基礎知識", "航空知識Ⅰ", "航空知識Ⅱ", "航空知識Ⅲ", "英会話Ⅰ", "英会話Ⅲ", "表現力コミュニケーション", "観光イベントプランニング", "観光概論", "観光概論基礎Ⅰ", "観光資源Ⅰ", "韓国語", "音響・音楽"], "teachers": ["ILC", "Saori", "上山 翔太郎", "上山翔太郎", "下辻 久子", "中野 智", "亀山 和也", "井上 勝馬", "佐藤 玲子", "倉持 健史", "八芳園", "内藤 法子", "北村 広一", "名鉄観光", "城 万紀子", "塩家 吹雪", "宮崎 辰", "富永 誠", "寺迫 寛子", "小倉 一夫", "小倉 通孝", "小池 美穂", "山本 美穂", "岡本 真理", "岡村 奈奈", "岡野 朋一", "市川 大地", "平地 和恵", "平岡 里実", "弓野 克彦", "担任", "日本航空", "早坂 英里", "星 麻美", "曽根 美恵", "服部 陵子", "本田 名智", "栗原 幸代", "櫻井 まどか", "武田 絢子", "津本 さおり", "渡辺 亜希子", "渡邊 昌恵", "溝田 祐一郎", "田村 勇樹", "田村 勇樹 ", "田隝 益美", "矢島 慶佑", "石原 健", "石垣 利恵", "神崎 公一", "竹内 秀次郎", "遠矢 浩和", "遠藤 孝博", "長木 利通", "関本 利恵", "関本 理恵", "青木 思生", "高見澤 肇", "髙島 良宏", "黒田 尚嗣"], "termNames": {"early": "前期", "late": "後期"}, "configured": true};}
 let CFG=defaultCFG();
+/* 学期ごとの公開設定。false のときは閲覧者に時間割を見せない（サーバー側でもデータを返さない）。
+   未設定は「公開」とみなし、これまでの動きを変えない。 */
+let PUBLISHED={early:true,late:true};
+function isPublished(tm){return PUBLISHED[tm||term]!==false;}
+/* 公開・非公開を切り替える */
+/* 編集画面のヘッダーに「準備中」の目印を出す */
+function updatePublishBadge(){
+  const el=document.getElementById("pubBadge");
+  if(!el)return;
+  if(VIEWER_MODE||isPublished()){el.style.display="none";return;}
+  el.style.display="";
+  el.textContent="準備中（学生には非表示）";
+}
+function togglePublish(){
+  const tm=term,t=termLabel(tm),now=isPublished(tm);
+  const msg=now
+    ? `${t}の時間割を「準備中」にします。\n\n・学生や教職員には表示されなくなります（データも送られません）\n・編集画面ではこれまでどおり編集できます\n\n準備中にしますか？`
+    : `${t}の時間割を「公開」します。\n\n・学生や教職員が見られるようになります\n\n公開しますか？`;
+  if(!confirm(msg))return;
+  PUBLISHED[tm]=!now;
+  renderClass();renderPerson();
+  schedulePush();
+  setSaved(t+(PUBLISHED[tm]?"を公開しました":"を準備中にしました"));
+}
 /* 既存コードが参照する変数群。CFGから毎回組み立てる（識別子は従来のまま） */
 let OPT={subjects:[],teachers:[],rooms:[],rooms_clean:[],world_by_grade:{}};
 let ROOMS=[],SPECIAL_ROOMS=[],DAYS=[],PERIODS=[],WORLD_ORDER=[];
@@ -1860,6 +1887,7 @@ function renderEditToolbar(){
       <button class="btn ok" id="exportEarlyXlsx">Excel出力</button>
       <button class="btn ghost" id="yearMenuBtnE">年度メニュー</button>
       <button class="btn ghost" id="worldUrlBtnE">コースURL一覧</button>
+      <button class="btn ghost" id="pub_early">${isPublished("early")?"学生に公開中 ▸ 準備中にする":"準備中 ▸ 学生に公開する"}</button>
       <button class="btn danger-ghost" id="resetEarly">${esc(termLabel("early"))}データを消去</button>
     </div><div id="progressPanel"></div><div id="checkPanel"></div>`;
     document.getElementById("exportEarlyXlsx").onclick=exportEarlyExcel;
@@ -1868,6 +1896,7 @@ function renderEditToolbar(){
     document.getElementById("checkAll").onclick=()=>{checkOpen=!checkOpen;if(checkOpen)progressOpen=false;renderProgress();renderCheck();};
     const ym=document.getElementById("yearMenuBtnE");if(ym)ym.onclick=openYearMenu;
     const wu=document.getElementById("worldUrlBtnE");if(wu)wu.onclick=exportWorldUrls;
+    const pe=document.getElementById("pub_early");if(pe)pe.onclick=togglePublish;
     const re_=document.getElementById("resetEarly");
     if(re_)re_.onclick=()=>{
       const t=termLabel("early");
@@ -1886,9 +1915,11 @@ function renderEditToolbar(){
     <button class="btn ok" id="exportXlsx">Excel出力</button>
     <button class="btn ghost" id="yearMenuBtnL">年度メニュー</button>
     <button class="btn ghost" id="worldUrlBtnL">コースURL一覧</button>
-    <button class="btn danger-ghost" id="resetLate">${esc(termLabel("late"))}データを消去</button>
+    <button class="btn ghost" id="pub_late">${isPublished("late")?"学生に公開中 ▸ 準備中にする":"準備中 ▸ 学生に公開する"}</button>
+      <button class="btn danger-ghost" id="resetLate">${esc(termLabel("late"))}データを消去</button>
   </div><div id="progressPanel"></div><div id="checkPanel"></div>`;
   document.getElementById("exportXlsx").onclick=exportExcel;
+  const pl=document.getElementById("pub_late");if(pl)pl.onclick=togglePublish;
   document.getElementById("resetLate").onclick=()=>{
     const t=termLabel("late");
     if(confirm(t+"に登録したデータをすべて消去します。\n（学生別の個別時間割は消えません）\n\nこの操作は元に戻せません。よろしいですか？")){
@@ -2199,7 +2230,20 @@ function printTimetable(kind){
   w.document.close();
 }
 
+/* 閲覧画面で、その学期がまだ公開されていないときの案内 */
+function notPublishedHTML(){
+  return '<div class="empty"><div class="big">'+esc(termLabel(term))+'の時間割は準備中です</div>'+
+    '<div>公開されるまで、しばらくお待ちください。</div></div>';
+}
 function renderClass(){
+  // 閲覧画面：未公開の学期は中身を見せない
+  if(VIEWER_MODE&&!isPublished()){
+    const note=document.getElementById("classNote"),out=document.getElementById("classOut");
+    if(note)note.innerHTML="";
+    if(out)out.innerHTML=notPublishedHTML();
+    return;
+  }
+  updatePublishBadge();
   const q=normQ(cstate.q).trim();
   renderEditToolbar();
   updateIntegBadge();
@@ -2693,7 +2737,13 @@ function renderPersonToolbar(){
   document.getElementById("printPersonAll").onclick=()=>{if(!latePersons.length){alert("学生が登録されていません");return;}printTimetable("person-all");};
   document.getElementById("resetLateP").onclick=()=>{if(confirm("後期の学生別データ（学生と時間割）をすべて消去します。よろしいですか？")){latePersons=[];lateP=[];saveLateP();pstate.person=null;rebuildPersonPick();renderPerson();}};
 }
-function renderPerson(){const q=normQ(pstate.q).trim();
+function renderPerson(){
+  if(VIEWER_MODE&&!isPublished()){
+    const out=document.getElementById("personOut");
+    if(out)out.innerHTML=notPublishedHTML();
+    return;
+  }
+  const q=normQ(pstate.q).trim();
   renderPersonToolbar();
   document.querySelectorAll("#personPick .pbtn").forEach(b=>b.classList.toggle("on",b.dataset.name===pstate.person));
   const note=document.getElementById("personNote"),out=document.getElementById("personOut");
@@ -3150,6 +3200,7 @@ function setTerm(t){term=t;
   // 名簿は学期共通のため、選択中の学生はそのまま保つ（在籍していなければ解除）
   if(pstate.person&&!personList().some(p=>p.name===pstate.person))pstate.person=null;
   // 前期・後期とも常に編集できるため、モードの切り替えは不要
+  updatePublishBadge();
   rebuildWorldChips();rebuildPersonPick();
   rstate.room=null;
   rebuildRoomPick();
@@ -3248,7 +3299,7 @@ function openYearMenu(){
 }
 function closeYearMenu(){const ov=document.getElementById("yearMenu");if(ov)ov.classList.remove("show");}
 function ymExport(){
-  const data={year:schoolYear,config:CFG,earlyRecords,lateRecords,latePersons,lateP,earlyP,exportedAt:new Date().toISOString()};
+  const data={year:schoolYear,config:CFG,published:PUBLISHED,earlyRecords,lateRecords,latePersons,lateP,earlyP,exportedAt:new Date().toISOString()};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);
   a.download=brandFile()+"時間割_"+schoolYear+"年度_"+new Date().toLocaleDateString("ja-JP").replace(/\//g,"")+".json";a.click();
@@ -3268,6 +3319,7 @@ function ymNewYear(copy){
     earlyRecords=[];lateRecords=[];
   }
   latePersons=[];lateP=[];earlyP=[];   // 学生別は引き継がず、新年度で登録し直す
+  PUBLISHED={early:false,late:false};  // 新年度は準備中から始める（整ったら公開する）
   schoolYear=next;saveYearLocal();
   // ローカル保存
   try{
@@ -3292,6 +3344,9 @@ function ymImport(){
         if(!confirm("読み込んだデータで現在の内容を置き換えます。よろしいですか？"))return;
         if(typeof d.year==="number"){schoolYear=d.year;saveYearLocal();}
         // 書き出したJSONに設定が入っていれば、それも復元する
+        if(d.published&&typeof d.published==="object"){
+          PUBLISHED={early:d.published.early!==false,late:d.published.late!==false};
+        }
         if(d.config&&typeof d.config==="object"){
           CFG=Object.assign(defaultCFG(),d.config);
           applyCFG();applyBranding();rebuildFromCFG();saveCfgLocal();
@@ -3378,6 +3433,9 @@ async function serverLoad(silent){
     if(j&&j.exists){
       // サーバーに保存された設定（学校名・コース・教室など）を反映する
       if(j.config&&typeof j.config==="object"){CFG=Object.assign(defaultCFG(),j.config);saveCfgLocal();}
+      if(j.published&&typeof j.published==="object"){
+        PUBLISHED={early:j.published.early!==false,late:j.published.late!==false};
+      }
       applyCFG();applyBranding();rebuildFromCFG();setupTabVisibility();
       if(!CFG.configured){
         if(VIEWER_MODE){showNotConfiguredNotice();return;}
@@ -3512,7 +3570,7 @@ async function doPush(){
   if(!tok){setSaved("⚠ サーバー未保存（未認証）");
     showEditGate("編集内容を保存するには、パスワードを入力してください。");return;}
   try{
-    const body={year:schoolYear,config:CFG,lateRecords,earlyRecords,latePersons,lateP,earlyP,baseUpdatedAt:serverUpdatedAt};
+    const body={year:schoolYear,config:CFG,published:PUBLISHED,lateRecords,earlyRecords,latePersons,lateP,earlyP,baseUpdatedAt:serverUpdatedAt};
     const r=await fetch(API_URL,{method:"PUT",
       headers:{"Content-Type":"application/json","x-edit-token":tok},
       body:JSON.stringify(body)});
