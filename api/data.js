@@ -56,12 +56,22 @@ export default async function handler(req, res) {
 
       // 2) 学生キー付き（?s=XXXX）→ クラス時間割 + 本人の学生データのみ
       const sKey = req.query && req.query.s ? String(req.query.s) : null;
+
+      // 学期の公開設定。未設定なら「公開」とみなす（従来の動きを変えないため）
+      const pub = (data.published && typeof data.published === "object")
+        ? data.published : { early: true, late: true };
+      const earlyPub = pub.early !== false;
+      const latePub = pub.late !== false;
+
+      // 未公開の学期は、閲覧者にはデータ自体を返さない（画面で隠すだけでは不十分なため）
       const base = {
         exists: true,
         year: typeof data.year === "number" ? data.year : null,
-        lateRecords: data.lateRecords || [],
-        earlyRecords: data.earlyRecords || [],
-        earlyEdits: data.earlyEdits || {},
+        config: data.config || null,
+        published: { early: earlyPub, late: latePub },
+        lateRecords: latePub ? (data.lateRecords || []) : [],
+        earlyRecords: earlyPub ? (data.earlyRecords || []) : [],
+        earlyEdits: earlyPub ? (data.earlyEdits || {}) : {},
         updatedAt: data.updatedAt || null,
       };
       if (sKey) {
@@ -74,8 +84,8 @@ export default async function handler(req, res) {
         return res.status(200).json({
           ...base,
           latePersons: [stu],
-          lateP: (data.lateP || []).filter((r) => r && r.person === stu.name),
-          earlyP: (data.earlyP || []).filter((r) => r && r.person === stu.name),
+          lateP: latePub ? (data.lateP || []).filter((r) => r && r.person === stu.name) : [],
+          earlyP: earlyPub ? (data.earlyP || []).filter((r) => r && r.person === stu.name) : [],
           student: true,
         });
       }
@@ -108,6 +118,12 @@ export default async function handler(req, res) {
 
       const updatedAt = new Date().toISOString();
       const data = {
+        published:
+          body.published && typeof body.published === "object"
+            ? { early: body.published.early !== false, late: body.published.late !== false }
+            : { early: true, late: true },
+        config:
+          body.config && typeof body.config === "object" ? body.config : null,
         year:
           typeof body.year === "number"
             ? body.year
