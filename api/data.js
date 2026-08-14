@@ -69,6 +69,7 @@ export default async function handler(req, res) {
         year: typeof data.year === "number" ? data.year : null,
         config: data.config || null,
         published: { early: earlyPub, late: latePub },
+        notice: data.notice || null,
         lateRecords: latePub ? (data.lateRecords || []) : [],
         earlyRecords: earlyPub ? (data.earlyRecords || []) : [],
         earlyEdits: earlyPub ? (data.earlyEdits || {}) : {},
@@ -117,7 +118,36 @@ export default async function handler(req, res) {
       }
 
       const updatedAt = new Date().toISOString();
+      // ---- 保存できる量の上限チェック（誤操作や不具合で巨大なデータが入るのを防ぐ）----
+      const LIMITS = {
+        classRecords: 20000,   // クラス時間割のコマ数（前期・後期それぞれ）
+        persons: 2000,         // 学生の人数
+        personRecords: 40000,  // 学生別のコマ数（学期ごと）
+        bytes: 4 * 1024 * 1024 // 保存する全体の大きさ（4MB）
+      };
+      const over = [];
+      const cnt = (a) => (Array.isArray(a) ? a.length : 0);
+      if (cnt(body.lateRecords) > LIMITS.classRecords) over.push("後半の時間割のコマ数");
+      if (cnt(body.earlyRecords) > LIMITS.classRecords) over.push("前半の時間割のコマ数");
+      if (cnt(body.latePersons) > LIMITS.persons) over.push("学生の人数");
+      if (cnt(body.lateP) > LIMITS.personRecords) over.push("学生別のコマ数（後半）");
+      if (cnt(body.earlyP) > LIMITS.personRecords) over.push("学生別のコマ数（前半）");
+      if (over.length) {
+        return res.status(413).json({
+          error: "データが大きすぎます：" + over.join("、") + "が上限を超えています。",
+          limits: LIMITS,
+        });
+      }
+
       const data = {
+        notice:
+          body.notice && typeof body.notice === "object"
+            ? {
+                text: String(body.notice.text || "").slice(0, 500),
+                level: body.notice.level === "alert" ? "alert" : "info",
+                until: String(body.notice.until || "").slice(0, 10),
+              }
+            : null,
         published:
           body.published && typeof body.published === "object"
             ? { early: body.published.early !== false, late: body.published.late !== false }
@@ -139,7 +169,40 @@ export default async function handler(req, res) {
         earlyP: Array.isArray(body.earlyP) ? body.earlyP : [],
         updatedAt,
       };
-      await kv(["SET", KEY, JSON.stringify(data)]);
+      // 変更履歴（誰がいつ、どこを変えたか）。直近50件だけ残す
+      const editor = String(req.headers["x-editor-name"] || "").slice(0, 40);
+      const prev = cur;   // 競合検出のときに読み込み済み
+      const summarize = (d) => ({
+        early: Array.isArray(d && d.earlyRecords) ? d.earlyRecords.length : 0,
+        late: Array.isArray(d && d.lateRecords) ? d.lateRecords.length : 0,
+        persons: Array.isArray(d && d.latePersons) ? d.latePersons.length : 0,
+        personRecs:
+          (Array.isArray(d && d.earlyP) ? d.earlyP.length : 0) +
+          (Array.isArray(d && d.lateP) ? d.lateP.length : 0),
+      });
+      const before = summarize(prev), after = summarize(data);
+      const changed = [];
+      if (before.early !== after.early) changed.push(`前半 ${before.early}→${after.early}コマ`);
+      if (before.late !== after.late) changed.push(`後半 ${before.late}→${after.late}コマ`);
+      if (before.persons !== after.persons) changed.push(`学生 ${before.persons}→${after.persons}人`);
+      if (before.personRecs !== after.personRecs) changed.push(`学生別 ${before.personRecs}→${after.personRecs}コマ`);
+      if (JSON.stringify(prev && prev.config) !== JSON.stringify(data.config)) changed.push("設定を変更");
+      if (JSON.stringify(prev && prev.published) !== JSON.stringify(data.published)) changed.push("公開状態を変更");
+      if (JSON.stringify(prev && prev.notice) !== JSON.stringify(data.notice)) changed.push("お知らせを変更");
+      if (prev && prev.year !== data.year) changed.push(`年度 ${prev.year}→${data.year}`);
+      const hist = Array.isArray(prev && prev.history) ? prev.history : [];
+      if (changed.length || !prev) {
+        hist.unshift({ at: updatedAt, by: editor || "（名前未設定）", what: changed.join(" / ") || "作成" });
+      }
+      data.history = hist.slice(0, 50);
+
+      const json = JSON.stringify(data);
+      if (json.length > LIMITS.bytes) {
+        return res.status(413).json({
+          error: "データ全体が大きすぎます（上限 4MB）。不要なデータを整理してください。",
+        });
+      }
+      await kv(["SET", KEY, json]);
       return res.status(200).json({ ok: true, updatedAt });
     }
 
