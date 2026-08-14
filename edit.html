@@ -591,6 +591,40 @@
     .ff-row{grid-template-columns:1fr;gap:16px}
   }
   /* 年度案内・準備中の全画面表示 */
+  /* ===== スマホでの見やすさ・押しやすさ ===== */
+  @media (max-width:640px){
+    /* 指で押せる大きさを確保する（推奨44px） */
+    .chip{padding:10px 14px;font-size:.9rem}
+    .tab{padding:11px 12px;font-size:.84rem}
+    .btn{min-height:42px;padding:10px 14px}
+    .edit-toolbar{gap:6px}
+    .edit-toolbar .btn{flex:1 1 46%;min-width:0;font-size:.82rem;padding:10px 8px}
+    .edit-toolbar .et-label{width:100%}
+    /* 時間割は横スクロールしつつ、時限列は固定して見失わないようにする */
+    table.week{min-width:560px}
+    table.week td.period-cell{position:sticky;left:0;z-index:2}
+    table.week thead th.corner{position:sticky;left:0;z-index:3}
+    .table-scroll{-webkit-overflow-scrolling:touch}
+    /* 入力ウィンドウは画面下から出す形にして、片手で扱いやすくする */
+    .overlay .modal{position:fixed;left:0;right:0;bottom:0;top:auto;max-height:88vh;
+      width:100%;max-width:none;border-radius:16px 16px 0 0;transform:none;margin:0;overflow-y:auto}
+    .overlay .modal input,.overlay .modal select,.overlay .modal textarea{font-size:16px}
+    .overlay .modal .mactions{position:sticky;bottom:0;background:#fff;padding-top:10px;
+      box-shadow:0 -6px 12px rgba(0,0,0,.06)}
+    .notice-bar{border-radius:0;font-size:.86rem;padding:10px 12px}
+    .filter-label{font-size:.78rem}
+    .search-row input{font-size:16px}
+  }
+  .notice-bar{display:flex;gap:10px;align-items:flex-start;padding:12px 16px;margin:0 auto;max-width:1200px;
+    font-size:.92rem;line-height:1.7;border-radius:0 0 10px 10px}
+  .notice-bar.info{background:#E7F2F7;color:#0F4C60;border:1px solid #BBD9E4;border-top:none}
+  .notice-bar.alert{background:#FDECEA;color:#8E2A20;border:1px solid #F3C2BC;border-top:none;font-weight:700}
+  .notice-bar .nb-ico{flex:none;font-size:1rem;line-height:1.5}
+  .notice-bar .nb-txt{flex:1;min-width:0}
+  .bk-note{display:inline-flex;align-items:center;background:#FFF4D6;color:#7A5A00;font-size:.72rem;
+    font-weight:800;padding:4px 10px;border-radius:12px;white-space:nowrap}
+  .err-badge{display:inline-flex;align-items:center;background:#F6E3E1;color:#8E2A20;font-size:.72rem;
+    font-weight:800;padding:4px 10px;border-radius:12px;white-space:nowrap;cursor:pointer}
   .pub-badge{display:inline-flex;align-items:center;gap:5px;background:#F5A623;color:#3D2B00;
     font-size:.74rem;font-weight:800;padding:4px 10px;border-radius:12px;letter-spacing:.02em;white-space:nowrap}
   #yearNotice{display:none;position:fixed;inset:0;z-index:9999;background:linear-gradient(160deg,#1E5B3C 0%,#134129 100%);align-items:center;justify-content:center;padding:24px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -619,13 +653,16 @@
     <button id="termLate">後期</button>
   </div>
   <span class="pub-badge" id="pubBadge" style="display:none"></span>
+  <span class="bk-note" id="bkNote" style="display:none"></span>
+  <span class="err-badge" id="errBadge" style="display:none" title="クリックで詳細"></span>
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v30</span>
+  <span class="app-ver">v31</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
+<div id="noticeBar" class="notice-bar info" style="display:none"></div>
 <div id="syncWarn" style="display:none"><div class="wrap">
   <span id="syncWarnMsg">⚠ サーバーに接続されていません。変更はこの端末にのみ保存され、他の人には共有されません。</span>
   <button class="btn" id="syncRetryBtn">再接続する</button>
@@ -905,16 +942,140 @@ let CFG=defaultCFG();
 /* 学期ごとの公開設定。false のときは閲覧者に時間割を見せない（サーバー側でもデータを返さない）。
    未設定は「公開」とみなし、これまでの動きを変えない。 */
 let PUBLISHED={early:true,late:true};
+/* ===== 不具合の記録（画面は壊さず、あとで原因を追えるようにする） ===== */
+const ERRLOG=[];
+function logErr(where,e){
+  try{
+    ERRLOG.unshift({at:new Date().toLocaleString("ja-JP"),where:String(where),
+      msg:(e&&e.message)?e.message:String(e)});
+    if(ERRLOG.length>50)ERRLOG.length=50;
+    if(window.console&&console.warn)console.warn("[時間割ツール]",where,e);
+    updateErrBadge();
+  }catch(_){}
+}
+function updateErrBadge(){
+  const el=document.getElementById("errBadge");
+  if(!el)return;
+  if(VIEWER_MODE||!ERRLOG.length){el.style.display="none";return;}
+  el.style.display="";el.textContent="不具合 "+ERRLOG.length+"件";
+}
+function showErrLog(){
+  if(!ERRLOG.length){alert("記録された不具合はありません。");return;}
+  const txt=ERRLOG.map(x=>`${x.at}  [${x.where}] ${x.msg}`).join("\n");
+  alert("記録された不具合（新しい順）\n\nこの内容をそのまま開発担当に伝えると原因を特定できます。\n\n"+txt);
+}
+/* 安全に実行する。失敗しても画面は止めず、記録だけ残す */
+function safe(where,fn){try{return fn();}catch(e){logErr(where,e);return undefined;}}
+
+/* ===== お知らせ欄 ===== */
+let NOTICE={text:"",level:"info",until:""};   // level: info / alert
+function noticeActive(){
+  if(!NOTICE||!NOTICE.text)return false;
+  if(NOTICE.until){try{
+    const end=new Date(NOTICE.until+"T23:59:59");
+    if(new Date()>end)return false;
+  }catch(e){}}
+  return true;
+}
+function renderNotice(){
+  const el=document.getElementById("noticeBar");
+  if(!el)return;
+  if(!noticeActive()){el.style.display="none";return;}
+  el.className="notice-bar "+(NOTICE.level==="alert"?"alert":"info");
+  el.innerHTML='<span class="nb-ico">'+(NOTICE.level==="alert"?"⚠":"📢")+'</span>'+
+    '<span class="nb-txt">'+esc(NOTICE.text).replace(/\n/g,"<br>")+'</span>';
+  el.style.display="";
+}
+function editNotice(){
+  const cur=NOTICE||{text:"",level:"info",until:""};
+  const txt=prompt("お知らせの文章を入力してください（空にすると消えます）。\n改行も使えます。",cur.text||"");
+  if(txt===null)return;
+  let level=cur.level||"info",until=cur.until||"";
+  if(txt.trim()){
+    level=confirm("重要なお知らせとして目立たせますか？\n\n「OK」＝赤色で強調（休講・緊急連絡など）\n「キャンセル」＝通常の青色")?"alert":"info";
+    const u=prompt("表示を終える日を YYYY-MM-DD で入力してください。\n（空欄なら、消すまでずっと表示します）",until||"");
+    if(u===null)return;
+    until=(u||"").trim();
+    if(until&&!/^\d{4}-\d{2}-\d{2}$/.test(until)){alert("日付の形式が正しくありません。例：2026-10-31");return;}
+  }
+  NOTICE={text:txt.trim(),level:level,until:until};
+  renderNotice();schedulePush();
+  setSaved(NOTICE.text?"お知らせを更新しました":"お知らせを削除しました");
+}
+
+/* ===== バックアップの経過日数を知らせる ===== */
+const BK_KEY="tt_last_backup";
+const BK_DAYS=60;   // 何日経ったら知らせるか
+function markBackup(){try{localStorage.setItem(BK_KEY,new Date().toISOString());}catch(e){}updateBackupNote();}
+function daysSinceBackup(){
+  try{const v=localStorage.getItem(BK_KEY);if(!v)return null;
+    return Math.floor((Date.now()-new Date(v).getTime())/86400000);}catch(e){return null;}
+}
+function updateBackupNote(){
+  const el=document.getElementById("bkNote");
+  if(!el)return;
+  if(VIEWER_MODE){el.style.display="none";return;}
+  const d=daysSinceBackup();
+  if(d===null){el.style.display="";el.textContent="バックアップ未実施";el.title="年度メニューから「年度データをJSON書き出し」を実行してください";return;}
+  if(d>=BK_DAYS){el.style.display="";el.textContent=`前回のバックアップから ${d}日`;el.title="年度メニューから書き出しをおすすめします";return;}
+  el.style.display="none";
+}
+
+/* ===== 変更履歴 ===== */
+let HISTORY=[];
+function showHistory(){
+  if(!HISTORY.length){alert("変更の記録がまだありません。\n（この機能を入れた後の変更から記録されます）");return;}
+  const txt=HISTORY.map(h=>{
+    const d=new Date(h.at);
+    const ds=isNaN(d)?h.at:d.toLocaleString("ja-JP",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"});
+    return `${ds}  ${h.by}\n    ${h.what}`;
+  }).join("\n");
+  alert("変更の記録（新しい順・最大50件）\n\n"+txt);
+}
+function askEditorName(){
+  let cur="";try{cur=localStorage.getItem("tt_editor_name")||"";}catch(e){}
+  const v=prompt("変更の記録に残す、あなたの名前を入力してください。\n（例：田中）空欄にすると「名前未設定」になります。",cur);
+  if(v===null)return;
+  try{localStorage.setItem("tt_editor_name",(v||"").trim());}catch(e){}
+  setSaved("記録する名前を設定しました");
+}
+
+/* ===== 元に戻す（Undo） ===== */
+const UNDO=[];const UNDO_MAX=20;
+/* 変更前の状態を控える。label は履歴に出す説明 */
+function snapshot(label){
+  try{
+    UNDO.push({label:label||"変更",
+      early:JSON.parse(JSON.stringify(earlyRecords)),
+      late:JSON.parse(JSON.stringify(lateRecords)),
+      persons:JSON.parse(JSON.stringify(latePersons)),
+      lateP:JSON.parse(JSON.stringify(lateP)),
+      earlyP:JSON.parse(JSON.stringify(earlyP))});
+    if(UNDO.length>UNDO_MAX)UNDO.shift();
+    updateUndoBtn();
+  }catch(e){logErr("snapshot",e);}
+}
+function undoLast(){
+  if(!UNDO.length){alert("元に戻せる操作がありません。");return;}
+  const s=UNDO.pop();
+  if(!confirm(`直前の操作「${s.label}」を取り消して、その前の状態に戻します。\nよろしいですか？`)){UNDO.push(s);return;}
+  earlyRecords=s.early;lateRecords=s.late;latePersons=s.persons;lateP=s.lateP;earlyP=s.earlyP;
+  safe("undo:save",()=>{saveEarlyEdits();saveLate();saveLateP();});
+  safe("undo:render",()=>renderAll());
+  updateUndoBtn();
+  setSaved(`「${s.label}」を元に戻しました`);
+}
+function updateUndoBtn(){
+  ["undoBtnE","undoBtnL"].forEach(id=>{
+    const b=document.getElementById(id);
+    if(!b)return;
+    b.disabled=!UNDO.length;
+    b.style.opacity=UNDO.length?"":"0.45";
+    b.textContent=UNDO.length?`↩ 元に戻す（${UNDO.length}）`:"↩ 元に戻す";
+  });
+}
 function isPublished(tm){return PUBLISHED[tm||term]!==false;}
 /* 公開・非公開を切り替える */
-/* 編集画面のヘッダーに「準備中」の目印を出す */
-function updatePublishBadge(){
-  const el=document.getElementById("pubBadge");
-  if(!el)return;
-  if(VIEWER_MODE||isPublished()){el.style.display="none";return;}
-  el.style.display="";
-  el.textContent="準備中（学生には非表示）";
-}
 function togglePublish(){
   const tm=term,t=termLabel(tm),now=isPublished(tm);
   const msg=now
@@ -925,6 +1086,14 @@ function togglePublish(){
   renderClass();renderPerson();
   schedulePush();
   setSaved(t+(PUBLISHED[tm]?"を公開しました":"を準備中にしました"));
+}
+/* 編集画面のヘッダーに「準備中」の目印を出す */
+function updatePublishBadge(){
+  const el=document.getElementById("pubBadge");
+  if(!el)return;
+  if(VIEWER_MODE||isPublished()){el.style.display="none";return;}
+  el.style.display="";
+  el.textContent="準備中（学生には非表示）";
 }
 /* 既存コードが参照する変数群。CFGから毎回組み立てる（識別子は従来のまま） */
 let OPT={subjects:[],teachers:[],rooms:[],rooms_clean:[],world_by_grade:{}};
@@ -1534,11 +1703,7 @@ function hl(s,q){if(!q||!s)return esc(s||"");
 function worldShortFull(w){
   const c=courseOf(w);
   if(c)return c.short;
-  // 設定に無い値：括弧や「ワールド」を落とした形でもう一度照合してみる（旧データ対策）
-  const bare=String(w||"").replace(/（[^）]*）/g,"").replace(/【[^】]*】/g,"").replace(/ワールド/g,"").trim();
-  const c2=(CFG.courses||[]).find(x=>x.short===bare||String(x.short).replace(/\(.*?\)/g,"")===bare);
-  if(c2)return c2.short;
-  return bare||String(w||"").trim();
+  return String(w||"").replace(/（[^）]*）/g,"").trim(); // 設定に無い値は素の文字列として扱う
 }
 function worldRank(w){
   const c=courseOf(w);
@@ -1891,6 +2056,9 @@ function renderEditToolbar(){
       <button class="btn ok" id="exportEarlyXlsx">Excel出力</button>
       <button class="btn ghost" id="yearMenuBtnE">年度メニュー</button>
       <button class="btn ghost" id="worldUrlBtnE">コースURL一覧</button>
+      <button class="btn ghost" id="undoBtnE">↩ 元に戻す</button>
+      <button class="btn ghost" id="noticeBtnE">お知らせ</button>
+      <button class="btn ghost" id="histBtnE">変更の記録</button>
       <button class="btn ghost" id="pub_early">${isPublished("early")?"学生に公開中 ▸ 準備中にする":"準備中 ▸ 学生に公開する"}</button>
       <button class="btn danger-ghost" id="resetEarly">${esc(termLabel("early"))}データを消去</button>
     </div><div id="progressPanel"></div><div id="checkPanel"></div>`;
@@ -1900,12 +2068,16 @@ function renderEditToolbar(){
     document.getElementById("checkAll").onclick=()=>{checkOpen=!checkOpen;if(checkOpen)progressOpen=false;renderProgress();renderCheck();};
     const ym=document.getElementById("yearMenuBtnE");if(ym)ym.onclick=openYearMenu;
     const wu=document.getElementById("worldUrlBtnE");if(wu)wu.onclick=exportWorldUrls;
+    const ue=document.getElementById("undoBtnE");if(ue)ue.onclick=undoLast;
+    updateUndoBtn();updateErrBadge();updateBackupNote();
+    const ne=document.getElementById("noticeBtnE");if(ne)ne.onclick=editNotice;
+    const he=document.getElementById("histBtnE");if(he)he.onclick=showHistory;
     const pe=document.getElementById("pub_early");if(pe)pe.onclick=togglePublish;
     const re_=document.getElementById("resetEarly");
     if(re_)re_.onclick=()=>{
       const t=termLabel("early");
       if(confirm(t+"に登録したデータをすべて消去します。\n（学生別の個別時間割は消えません）\n\nこの操作は元に戻せません。よろしいですか？")){
-        earlyRecords=[];saveEarlyEdits();renderClass();
+        snapshot(t+"データの消去");earlyRecords=[];saveEarlyEdits();renderClass();
         setSaved(t+"データを消去しました");}};
     renderProgress();renderCheck();
     return;
@@ -1919,15 +2091,22 @@ function renderEditToolbar(){
     <button class="btn ok" id="exportXlsx">Excel出力</button>
     <button class="btn ghost" id="yearMenuBtnL">年度メニュー</button>
     <button class="btn ghost" id="worldUrlBtnL">コースURL一覧</button>
-    <button class="btn ghost" id="pub_late">${isPublished("late")?"学生に公開中 ▸ 準備中にする":"準備中 ▸ 学生に公開する"}</button>
+    <button class="btn ghost" id="undoBtnL">↩ 元に戻す</button>
+      <button class="btn ghost" id="noticeBtnL">お知らせ</button>
+      <button class="btn ghost" id="histBtnL">変更の記録</button>
+      <button class="btn ghost" id="pub_late">${isPublished("late")?"学生に公開中 ▸ 準備中にする":"準備中 ▸ 学生に公開する"}</button>
       <button class="btn danger-ghost" id="resetLate">${esc(termLabel("late"))}データを消去</button>
   </div><div id="progressPanel"></div><div id="checkPanel"></div>`;
   document.getElementById("exportXlsx").onclick=exportExcel;
+  const ul=document.getElementById("undoBtnL");if(ul)ul.onclick=undoLast;
+  updateUndoBtn();updateErrBadge();updateBackupNote();
+  const nl=document.getElementById("noticeBtnL");if(nl)nl.onclick=editNotice;
+  const hl_=document.getElementById("histBtnL");if(hl_)hl_.onclick=showHistory;
   const pl=document.getElementById("pub_late");if(pl)pl.onclick=togglePublish;
   document.getElementById("resetLate").onclick=()=>{
     const t=termLabel("late");
     if(confirm(t+"に登録したデータをすべて消去します。\n（学生別の個別時間割は消えません）\n\nこの操作は元に戻せません。よろしいですか？")){
-      lateRecords=[];saveLate();renderClass();setSaved(t+"データを消去しました");}};
+      snapshot(t+"データの消去");lateRecords=[];saveLate();renderClass();setSaved(t+"データを消去しました");}};
   const ymL=document.getElementById("yearMenuBtnL");if(ymL)ymL.onclick=openYearMenu;
   const wuL=document.getElementById("worldUrlBtnL");if(wuL)wuL.onclick=exportWorldUrls;
   document.getElementById("toggleProgress").onclick=()=>{progressOpen=!progressOpen;if(progressOpen)checkOpen=false;renderProgress();renderCheck();};
@@ -2454,6 +2633,7 @@ function cellRecords(g,wShort,d,p){
 function findLate(g,wShort,d,p){return cellRecords(g,wShort,d,p)[0];}
 // 枠の授業リストをまるごと保存（前期＝差分、後期＝lateRecords）。recsは0件以上の配列
 function saveCellRecords(grade,wShort,day,period,recs){
+  snapshot("授業の登録・変更");
   const wkey=courseKeyFromShort(wShort);
   // 値を正規化（world にはコースのキーを保存する）
   const norm=recs.map(r=>({grade:grade,world:wkey,day:day,period:period,time:PTIME_FULL[period],
@@ -2600,6 +2780,7 @@ function execSlotCopy(){
   if(overwrite.length)msg+=`\nうち ${overwrite.length}コマ には既に授業があり、上書きされます。`;
   msg+="\nよろしいですか？";
   if(!confirm(msg))return;
+  snapshot("枠コピー");
   dests.forEach(t=>saveCellRecords(scSrc.grade,t.w,t.d,t.p,scSrc.recs));
   closeSlotCopy();closeModal();renderClass();
   setSaved(`枠コピー完了（${dests.length}コマ）`);
@@ -2705,7 +2886,8 @@ function exportWorldUrls(){
     txt+=`${g}年 ${sh}\t${base}/?${yq}&w=${wp(sh)}&g=${g}\n`;});});
   const blob=new Blob([txt],{type:"text/plain;charset=utf-8"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);
-  a.download="コースURL一覧_"+schoolYear+"年度.txt";a.click();
+    markBackup();
+a.download="コースURL一覧_"+schoolYear+"年度.txt";a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
 /* 学生ごとの閲覧URL一覧をテキストで書き出す（本人にのみ配布する） */
@@ -2826,7 +3008,7 @@ function openStudentModal(name){
   };
   document.getElementById("spDelete").onclick=()=>{
     if(!confirm(`${name} さんと、その時間割データを削除します。よろしいですか？`))return;
-    latePersons=latePersons.filter(x=>x.name!==name);lateP=lateP.filter(r=>r.person!==name);earlyP=earlyP.filter(r=>r.person!==name);
+    snapshot("学生の削除");latePersons=latePersons.filter(x=>x.name!==name);lateP=lateP.filter(r=>r.person!==name);earlyP=earlyP.filter(r=>r.person!==name);
     if(pstate.person===name)pstate.person=null;
     saveLateP();rebuildPersonPick();renderPerson();closeStudentModal();
   };
@@ -3227,6 +3409,7 @@ const API_URL="/api/data";
 let serverMode=false;        // サーバーと同期中か
 let serverUpdatedAt=null;    // 最後に読み込んだサーバーデータの更新時刻（競合検出用）
 let pushTimer=null;
+let pushRetry=0;const PUSH_RETRY_MAX=5;  // 通信エラー時の自動再送
 
 /* 表記ゆれの自動変換は汎用版では使わない（コースはキーで保存されるため不要） */
 /* 取り込んだデータの中に、設定に無いコースが含まれていないか調べる。
@@ -3437,6 +3620,9 @@ async function serverLoad(silent){
     if(j&&j.exists){
       // サーバーに保存された設定（学校名・コース・教室など）を反映する
       if(j.config&&typeof j.config==="object"){CFG=Object.assign(defaultCFG(),j.config);saveCfgLocal();}
+      if(j.notice&&typeof j.notice==="object")NOTICE=j.notice;
+      if(Array.isArray(j.history))HISTORY=j.history;
+      safe("renderNotice",()=>renderNotice());
       if(j.published&&typeof j.published==="object"){
         PUBLISHED={early:j.published.early!==false,late:j.published.late!==false};
       }
@@ -3456,9 +3642,8 @@ async function serverLoad(silent){
       if(typeof j.year==="number"){schoolYear=j.year;saveYearLocal();}
       latePersons=j.latePersons||[];lateP=j.lateP||[];earlyP=j.earlyP||[];
       // 旧形式のデータ（コースが正式名称の文字列）をキーへ変換する。初回の読み込み時だけ動く
-      try{const mg=migrateWorldKeys();
-        if(mg>0&&!VIEWER_MODE){saveEarlyEdits();saveLate();saveLateP();}
-      }catch(e){}
+      safe("migrate",()=>{const mg=migrateWorldKeys();
+        if(mg>0&&!VIEWER_MODE){saveEarlyEdits();saveLate();saveLateP();}});
       serverUpdatedAt=j.updatedAt||null;
       updateYearBadge();
       // 編集画面：キー未発行の学生がいれば発行してサーバーに反映
@@ -3574,9 +3759,10 @@ async function doPush(){
   if(!tok){setSaved("⚠ サーバー未保存（未認証）");
     showEditGate("編集内容を保存するには、パスワードを入力してください。");return;}
   try{
-    const body={year:schoolYear,config:CFG,published:PUBLISHED,lateRecords,earlyRecords,latePersons,lateP,earlyP,baseUpdatedAt:serverUpdatedAt};
+    const body={year:schoolYear,config:CFG,published:PUBLISHED,notice:NOTICE,lateRecords,earlyRecords,latePersons,lateP,earlyP,baseUpdatedAt:serverUpdatedAt};
     const r=await fetch(API_URL,{method:"PUT",
-      headers:{"Content-Type":"application/json","x-edit-token":tok},
+      headers:{"Content-Type":"application/json","x-edit-token":tok,
+        "x-editor-name":(localStorage.getItem("tt_editor_name")||"")},
       body:JSON.stringify(body)});
     if(r.status===401){
       let ts=null;try{const b=await r.json();ts=b?b.tokenSet:null;}catch(e2){}
@@ -3598,8 +3784,20 @@ async function doPush(){
     const j=await r.json();
     serverUpdatedAt=j.updatedAt;
     setSaved("サーバーに保存 "+new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}));
+    pushRetry=0;   // 成功したので再送カウントを戻す
   }catch(e){
-    setSaved("⚠ サーバー保存に失敗（通信エラー）");
+    logErr("doPush",e);
+    // 通信エラーは一時的なことが多いので、間隔を空けて自動で再送する
+    if(pushRetry<PUSH_RETRY_MAX){
+      pushRetry++;
+      const wait=Math.min(30000,2000*Math.pow(2,pushRetry-1)); // 2秒→4秒→8秒→16秒→30秒
+      setSaved(`⚠ 保存に失敗。${Math.round(wait/1000)}秒後に再送します（${pushRetry}/${PUSH_RETRY_MAX}）`);
+      clearTimeout(pushTimer);
+      pushTimer=setTimeout(doPush,wait);
+    }else{
+      setSaved("⚠ サーバー保存に失敗（通信エラー）");
+      showSyncWarn("保存に何度も失敗しています。通信状況を確認し、「最新に更新」を押すか、ページを開き直してください。編集内容はこの端末には残っています。");
+    }
   }
 }
 
@@ -3616,6 +3814,7 @@ async function doPush(){
       /* 表示名への解決は設定の読み込み後に applyViewerSelection() で行う */
   }else if(location.protocol!=="file:"){
     // 編集画面：入口ゲートの配線（Enterキーでも送信）
+    const eb=document.getElementById("errBadge");if(eb)eb.onclick=showErrLog;
     const b=document.getElementById("gateBtn");if(b)b.onclick=gateSubmit;
     const i=document.getElementById("gatePw");if(i)i.onkeydown=e=>{if(e.key==="Enter")gateSubmit();};
   }
@@ -3628,6 +3827,11 @@ rebuildFromCFG();
 updateYearBadge();
 renderClass();renderPerson();renderFree();renderSlot();renderRoom();
 setupTabVisibility();      // 設定タブは編集画面だけに出す
+updateBackupNote();updateUndoBtn();updateErrBadge();renderNotice();
+/* バックアップ表示をクリックしたら、その場で書き出せるようにする */
+(function(){const b=document.getElementById("bkNote");
+  if(b&&!VIEWER_MODE){b.style.cursor="pointer";b.title="クリックすると年度データを書き出します";
+    b.onclick=()=>{if(typeof ymExport==="function")ymExport();else if(typeof openYearMenu==="function")openYearMenu();};}})();
 serverLoad(true);          // サーバーがあれば共有の設定・データを読み込む
 if(location.protocol==="file:")openSetupIfNeeded(); // ファイル直接開きは即セットアップ
 </script>
