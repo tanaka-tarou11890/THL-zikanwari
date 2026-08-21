@@ -654,7 +654,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v31</span>
+  <span class="app-ver">v32</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
@@ -700,6 +700,38 @@
       </div>
     </div>
     <button class="ym-close" id="ymClose">閉じる</button>
+  </div>
+</div>
+<div class="ym-overlay" id="noticeDlg">
+  <div class="ym-card">
+    <h3>お知らせの設定</h3>
+    <div class="ym-sub">画面の上部に帯で表示されます（閲覧画面・学生ページにも出ます）。印刷には出ません。</div>
+    <div class="ym-sec">
+      <div class="ym-t">お知らせの文章</div>
+      <div class="ym-d">改行して複数行にできます。空にすると、お知らせは消えます。</div>
+      <textarea id="ndText" rows="5" placeholder="例）10/3(金)は台風のため休講です&#10;振替日は追ってお知らせします"></textarea>
+    </div>
+    <div class="ym-sec">
+      <div class="ym-t">目立たせ方</div>
+      <div class="cfg-toggles" id="ndLevel">
+        <div class="cfg-tg" data-lv="info">📢 通常（青）</div>
+        <div class="cfg-tg" data-lv="alert">⚠ 重要（赤）</div>
+      </div>
+    </div>
+    <div class="ym-sec">
+      <div class="ym-t">表示を終える日（任意）</div>
+      <div class="ym-d">その日を過ぎると自動で消えます。空欄なら、消すまでずっと表示します。</div>
+      <input type="date" id="ndUntil">
+    </div>
+    <div class="ym-sec">
+      <div class="ym-t">表示イメージ</div>
+      <div id="ndPreview" class="notice-bar info" style="display:none"></div>
+    </div>
+    <div class="ym-row" style="margin-bottom:6px">
+      <button class="btn edit" id="ndSave">保存する</button>
+      <button class="btn danger-ghost" id="ndClear">お知らせを消す</button>
+      <button class="btn ghost" id="ndCancel">キャンセル</button>
+    </div>
   </div>
 </div>
 <div class="ym-overlay" id="slotCopyMenu">
@@ -984,20 +1016,50 @@ function renderNotice(){
 }
 function editNotice(){
   const cur=NOTICE||{text:"",level:"info",until:""};
-  const txt=prompt("お知らせの文章を入力してください（空にすると消えます）。\n改行も使えます。",cur.text||"");
-  if(txt===null)return;
-  let level=cur.level||"info",until=cur.until||"";
-  if(txt.trim()){
-    level=confirm("重要なお知らせとして目立たせますか？\n\n「OK」＝赤色で強調（休講・緊急連絡など）\n「キャンセル」＝通常の青色")?"alert":"info";
-    const u=prompt("表示を終える日を YYYY-MM-DD で入力してください。\n（空欄なら、消すまでずっと表示します）",until||"");
-    if(u===null)return;
-    until=(u||"").trim();
-    if(until&&!/^\d{4}-\d{2}-\d{2}$/.test(until)){alert("日付の形式が正しくありません。例：2026-10-31");return;}
-  }
-  NOTICE={text:txt.trim(),level:level,until:until};
-  renderNotice();schedulePush();
-  setSaved(NOTICE.text?"お知らせを更新しました":"お知らせを削除しました");
+  document.getElementById("ndText").value=cur.text||"";
+  document.getElementById("ndUntil").value=cur.until||"";
+  setNdLevel(cur.level==="alert"?"alert":"info");
+  ndPreview();
+  document.getElementById("noticeDlg").classList.add("show");
+  setTimeout(()=>{const t=document.getElementById("ndText");if(t)t.focus();},50);
 }
+function setNdLevel(lv){
+  document.querySelectorAll("#ndLevel .cfg-tg").forEach(e=>e.classList.toggle("on",e.dataset.lv===lv));
+}
+function getNdLevel(){
+  const on=document.querySelector("#ndLevel .cfg-tg.on");
+  return on?on.dataset.lv:"info";
+}
+/* 入力中の内容で、表示イメージをその場で見せる */
+function ndPreview(){
+  const el=document.getElementById("ndPreview");
+  if(!el)return;
+  const txt=(document.getElementById("ndText").value||"").trim();
+  if(!txt){el.style.display="none";return;}
+  const lv=getNdLevel();
+  el.className="notice-bar "+(lv==="alert"?"alert":"info");
+  el.innerHTML='<span class="nb-ico">'+(lv==="alert"?"⚠":"📢")+'</span>'+
+    '<span class="nb-txt">'+esc(txt).replace(/\n/g,"<br>")+'</span>';
+  el.style.display="";
+}
+function closeNoticeDlg(){document.getElementById("noticeDlg").classList.remove("show");}
+function saveNotice(clear){
+  const txt=clear?"":(document.getElementById("ndText").value||"").trim();
+  const until=clear?"":(document.getElementById("ndUntil").value||"").trim();
+  NOTICE={text:txt,level:getNdLevel(),until:until};
+  renderNotice();schedulePush();closeNoticeDlg();
+  setSaved(NOTICE.text?"お知らせを更新しました":"お知らせを消しました");
+}
+
+(function(){
+  const t=document.getElementById("ndText");if(t)t.addEventListener("input",ndPreview);
+  document.querySelectorAll("#ndLevel .cfg-tg").forEach(e=>e.onclick=()=>{setNdLevel(e.dataset.lv);ndPreview();});
+  const s1=document.getElementById("ndSave");if(s1)s1.onclick=()=>saveNotice(false);
+  const s2=document.getElementById("ndClear");if(s2)s2.onclick=()=>{
+    if(confirm("お知らせを消します。よろしいですか？"))saveNotice(true);};
+  const s3=document.getElementById("ndCancel");if(s3)s3.onclick=closeNoticeDlg;
+  const ov=document.getElementById("noticeDlg");if(ov)ov.onclick=e=>{if(e.target.id==="noticeDlg")closeNoticeDlg();};
+})();
 
 /* ===== バックアップの経過日数を知らせる ===== */
 const BK_KEY="tt_last_backup";
