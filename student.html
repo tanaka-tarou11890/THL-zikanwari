@@ -654,7 +654,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v32</span>
+  <span class="app-ver">v33</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
@@ -981,6 +981,22 @@ function logErr(where,e){
     updateErrBadge();
   }catch(_){}
 }
+/* 失敗しても画面を壊さずに続けたい処理は、これで包む。
+   失敗の内容は記録に残るので、あとから「診断」で確認できる。
+   例）safe(()=>renderClass(),"時間割の描画")
+   ※ localStorage の読み書きのように「使えなくても正常」な処理は、
+     記録すると雑音になるだけなので、これまでどおり握りつぶしてよい。 */
+function safe(fn,where){
+  if(typeof fn!=="function"){logErr(where||"処理","関数が渡されていません");return undefined;}
+  try{return fn();}catch(e){logErr(where||"処理",e);return undefined;}
+}
+/* 失敗しても画面を止めたくない処理は safe() で囲む。
+   失敗は記録に残るので、あとから「診断」で原因を確認できる。
+   （端末の保存領域が使えない等、失敗が想定内で記録の必要がないものは
+     従来どおり try{...}catch(e){} のままにしている） */
+function safe(where,fn,fallback){
+  try{return fn();}catch(e){logErr(where,e);return fallback;}
+}
 function updateErrBadge(){
   const el=document.getElementById("errBadge");
   if(!el)return;
@@ -1239,12 +1255,12 @@ function applyBranding(){
 }
 /* 設定が変わったら、画面の各チップ・候補を組み立て直す */
 function rebuildFromCFG(){
-  try{buildClassChips();}catch(e){}
-  try{buildFreeChips();}catch(e){}
-  try{buildSlotChips();}catch(e){}
-  try{rebuildWorldChips();}catch(e){}
-  try{rebuildRoomPick();}catch(e){}
-  try{rebuildPersonPick();}catch(e){}
+  try{buildClassChips();}catch(e){logErr("学年・曜日・時限の作り直し",e);}
+  try{buildFreeChips();}catch(e){logErr("空き教室の条件の作り直し",e);}
+  try{buildSlotChips();}catch(e){logErr("時限別の条件の作り直し",e);}
+  try{rebuildWorldChips();}catch(e){logErr("コース一覧の作り直し",e);}
+  try{rebuildRoomPick();}catch(e){logErr("教室一覧の作り直し",e);}
+  try{rebuildPersonPick();}catch(e){logErr("学生一覧の作り直し",e);}
   applyViewerSelection();
 }
 /* コースURL（?w=）を、設定が届いてから表示名に解決して選択状態にする */
@@ -1254,7 +1270,7 @@ function applyViewerSelection(){
   const short=WORLD_URL_KEYS[VIEWER_WORLD]||(c?c.short:VIEWER_WORLD);
   cstate.world=short;
   if(VIEWER_GRADE)cstate.grade=VIEWER_GRADE;
-  try{rebuildWorldChips();refreshChips("#classPanel",cstate);}catch(e){}
+  try{rebuildWorldChips();refreshChips("#classPanel",cstate);}catch(e){logErr("コースURLの反映",e);}
 }
 /* ===================== 設定（マスタ）画面 ===================== */
 let CFGD=null;               // 編集中の下書き
@@ -1607,11 +1623,11 @@ function saveCfg(){
   CFG_DIRTY={};   // 保存できたので未保存マークを消す
   CFG=JSON.parse(JSON.stringify(CFGD));
   applyCFG();applyBranding();rebuildFromCFG();
-  try{saveCfgLocal();}catch(e2){}
-  try{schedulePush();}catch(e2){}
+  try{saveCfgLocal();}catch(e2){logErr("設定の端末保存",e2);}
+  try{schedulePush();}catch(e2){logErr("設定のサーバー保存",e2);}
   document.getElementById("setupWizard").classList.remove("show");
-  try{renderAll();}catch(e2){}
-  try{if(document.getElementById("configView").style.display!=="none")renderCfg();}catch(e2){}
+  try{renderAll();}catch(e2){logErr("設定保存後の画面更新",e2);}
+  try{if(document.getElementById("configView").style.display!=="none")renderCfg();}catch(e2){logErr("設定画面の再描画",e2);}
   setSaved("設定を保存しました "+new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}));
   alert("設定を保存しました。");
 }
@@ -1638,9 +1654,11 @@ function importCfg(){
     r.readAsText(f,"utf-8");};
   inp.click();
 }
+/* 以下、localStorage / sessionStorage の読み書きは、ブラウザの設定で使えない場合がある。
+   使えなくてもサーバー側にデータがあるため支障はないので、失敗はあえて記録しない。 */
 const CFG_STORE="tt_config_v1";
 function saveCfgLocal(){try{localStorage.setItem(CFG_STORE,JSON.stringify(CFG));}catch(e){}}
-function loadCfgLocal(){try{const t=localStorage.getItem(CFG_STORE);if(t)CFG=Object.assign(defaultCFG(),JSON.parse(t));}catch(e){}}
+function loadCfgLocal(){try{const t=localStorage.getItem(CFG_STORE);if(t)CFG=Object.assign(defaultCFG(),JSON.parse(t));}catch(e){logErr("端末に保存された設定の読み込み",e);}}
 /* 未設定なら、編集画面でセットアップを開く */
 function openSetupIfNeeded(){
   if(VIEWER_MODE)return false;
@@ -1676,7 +1694,7 @@ const STORE_KEY="tt_kouki_records_v1";
 // ===== 状態 =====
 let term="early"; // early=前期, late=後期
 let lateRecords=[];
-function loadLate(){try{const s=localStorage.getItem(STORE_KEY);if(s)lateRecords=JSON.parse(s);}catch(e){lateRecords=[];}}
+function loadLate(){try{const s=localStorage.getItem(STORE_KEY);if(s)lateRecords=JSON.parse(s);}catch(e){lateRecords=[];logErr("端末に保存された後期データの読み込み",e);}}
 function saveLate(){try{localStorage.setItem(STORE_KEY,JSON.stringify(lateRecords));
   setSaved("自動保存済み "+new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}));}catch(e){}
   schedulePush();}
@@ -1709,8 +1727,8 @@ function loadEarlyEdits(){
   try{
     const sNew=localStorage.getItem("tt_zenki_records_v1");
     if(sNew){earlyRecords=JSON.parse(sNew);return;}
-  }catch(e){}
-  try{const s=localStorage.getItem(STORE_EEDIT);if(s)earlyEdits=JSON.parse(s);}catch(e){earlyEdits={};}
+  }catch(e){logErr("端末に保存された前期データの読み込み",e);}
+  try{const s=localStorage.getItem(STORE_EEDIT);if(s)earlyEdits=JSON.parse(s);}catch(e){earlyEdits={};logErr("旧形式の前期データの読み込み",e);}
   earlyRecords=buildEarlyFromGen();
 }
 function buildEarlyFromGen(){
@@ -2062,7 +2080,7 @@ const cstate={q:"",grade:null,world:null,day:null,period:null};
     const mg=location.search.match(/[?&]g=([1-4])/);
     if(mg){const g=+mg[1];
       if((OPT.world_by_grade[String(g)]||[]).some(x=>worldShortFull(x)===wname))cstate.grade=g;}
-  }catch(e){}
+  }catch(e){logErr("URLのコース・学年の解釈",e);}
 })();
 let worldGroups=[];
 function rebuildWorldChips(){
@@ -2890,7 +2908,7 @@ const STORE_PREC_E="tt_zenki_personrecs_v1";
 let latePersons=[],lateP=[],earlyP=[];
 function loadLateP(){try{const a=localStorage.getItem(STORE_PKEY);if(a)latePersons=JSON.parse(a);
   const b=localStorage.getItem(STORE_PREC);if(b)lateP=JSON.parse(b);
-  const c=localStorage.getItem(STORE_PREC_E);if(c)earlyP=JSON.parse(c);}catch(e){latePersons=[];lateP=[];earlyP=[];}}
+  const c=localStorage.getItem(STORE_PREC_E);if(c)earlyP=JSON.parse(c);}catch(e){latePersons=[];lateP=[];earlyP=[];logErr("端末に保存された学生データの読み込み",e);}}
 function saveLateP(){
   if(!VIEWER_MODE)ensureStudentKeys(); // 学生キーの自動発行（追加・読込のどの経路でも）
   try{localStorage.setItem(STORE_PKEY,JSON.stringify(latePersons));
