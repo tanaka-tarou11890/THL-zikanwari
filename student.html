@@ -73,7 +73,7 @@
   .ym-sec .ym-d{font-size:.78rem;color:var(--ink-soft);margin-bottom:10px;line-height:1.5}
   .ym-sec .ym-row{display:flex;gap:8px;flex-wrap:wrap}
   .ym-card .ym-close{display:block;width:100%;margin-top:6px;background:var(--line-soft);color:var(--ink);border:none;padding:10px;border-radius:9px;font-weight:600}
-  .sc-grid{display:grid;grid-template-columns:52px repeat(5,1fr);gap:5px}
+  .sc-grid{display:grid;grid-template-columns:52px repeat(var(--sc-days,5),1fr);gap:5px}
   .sc-h{font-size:.72rem;font-weight:700;color:var(--ink-soft);display:flex;align-items:center;justify-content:center;padding:4px 0}
   .sc-cell{border:1.5px solid var(--line);border-radius:8px;padding:6px 2px;text-align:center;font-size:.7rem;cursor:pointer;user-select:none;line-height:1.25;background:#fff}
   .sc-cell.on{border-color:var(--accent);background:var(--accent);color:#fff;font-weight:700}
@@ -654,7 +654,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v34</span>
+  <span class="app-ver">v35</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
@@ -2849,6 +2849,7 @@ function renderScWorlds(){
 }
 function renderScGrid(){
   const el=document.getElementById("scGrid");
+  el.style.setProperty("--sc-days",String(DAYS.length));  // 曜日の数だけ列を作る（土曜などを足しても崩れない）
   let html=`<div class="sc-h"></div>`+DAYS.map(d=>`<div class="sc-h">${d}</div>`).join("");
   PERIODS.forEach(p=>{
     html+=`<div class="sc-h">${p}限</div>`;
