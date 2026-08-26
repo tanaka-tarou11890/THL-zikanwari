@@ -654,7 +654,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v36</span>
+  <span class="app-ver">v37</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
@@ -2527,7 +2527,7 @@ function renderClass(){
     const wfull=fullWorldName(cstate.grade,cstate.world);
     const gridRows=classData().filter(r=>r.grade===cstate.grade&&worldShortFull(r.world)===cstate.world);
     const termName=termLabel(isLate()?"late":"early");
-    note.innerHTML=`<div class="mode-note e"><b>${cstate.grade}年 ${cstate.world}</b>　マスをクリックで${isLate()?'登録・':''}編集、授業を<b>ドラッグして別のマスへ移動</b>できます。黄色は現在のコマです。</div>`;
+    note.innerHTML=`<div class="mode-note e"><b>${cstate.grade}年 ${cstate.world}</b>　マスをクリックで登録・編集、授業を<b>ドラッグして別のマスへ移動</b>できます。黄色は現在のコマです。</div>`;
     out.innerHTML=`<div class="grid-head"><span class="gtitle">${cstate.grade}年 ${cstate.world}</span><span class="gworld">${termName} / ${wfull}</span><button class="btn ghost btn-sm" id="copyDayBtn">曜日コピー</button><button class="btn ghost btn-sm" id="printClassOne" style="margin-left:8px">印刷</button></div>`+buildGrid(gridRows,q,{cls:"e",editable:true,day:cstate.day,period:cstate.period,world:cstate.world});
     bindEditCells();
     const pb=document.getElementById("printClassOne");if(pb)pb.onclick=()=>printTimetable("class");
@@ -3013,10 +3013,10 @@ function exportStudentUrls(){
 }
 function renderPersonToolbar(){
   const tb=document.getElementById("personToolbar");
-  if(VIEWER_MODE||!isLate()){tb.innerHTML="";return;}
+  if(VIEWER_MODE){tb.innerHTML="";return;}
   tb.innerHTML=`<div class="edit-toolbar">
-    <span class="et-label">後期 学生別 編集モード</span>
-    <span style="font-size:.82rem;color:var(--ink-soft)">学生 ${latePersons.length} 名 / コマ ${lateP.length} 件</span>
+    <span class="et-label">${esc(termLabel(term))} 学生別 編集モード</span>
+    <span style="font-size:.82rem;color:var(--ink-soft)">学生 ${latePersons.length} 名 / コマ ${personRecords().length} 件</span>
     <button class="btn ghost" id="studentUrlBtn" style="margin-left:auto">学生URL一覧</button>
     <button class="btn ghost" id="printPersonAll">全員印刷</button>
     <button class="btn ok" id="exportPXlsx">Excel出力</button>
@@ -3029,7 +3029,10 @@ function renderPersonToolbar(){
   document.getElementById("exportPJson").onclick=exportPersonJson;
   document.getElementById("importPJson").onclick=importPersonJson;
   document.getElementById("printPersonAll").onclick=()=>{if(!latePersons.length){alert("学生が登録されていません");return;}printTimetable("person-all");};
-  document.getElementById("resetLateP").onclick=()=>{if(confirm("後期の学生別データ（学生と時間割）をすべて消去します。よろしいですか？")){latePersons=[];lateP=[];saveLateP();pstate.person=null;rebuildPersonPick();renderPerson();}};
+  document.getElementById("resetLateP").onclick=()=>{
+    if(confirm("学生別データ（学生の名簿と、前期・後期の個別時間割）をすべて消去します。\n\nこの操作は元に戻せません。よろしいですか？")){
+      snapshot("学生別データの消去");
+      latePersons=[];lateP=[];earlyP=[];saveLateP();pstate.person=null;rebuildPersonPick();renderPerson();}};
 }
 function renderPerson(){
   if(VIEWER_MODE&&!isPublished()){
@@ -3322,7 +3325,7 @@ async function exportPersonExcel(){
     DAYS.forEach((d,i)=>{const c=ws.getCell(2,2+i);c.value=d;c.fill={type:'pattern',pattern:'solid',fgColor:{argb:C.head}};c.font={color:{argb:"FFFFFFFF"},bold:true};c.border=bd();c.alignment={horizontal:'center'};});
     PERIODS.forEach((per,ri)=>{const row=3+ri;ws.getRow(row).height=50;
       const pc=ws.getCell(row,1);pc.value=`${per}限\n${PTIME_FULL[per]}`;pc.alignment={horizontal:'center',vertical:'middle',wrapText:true};pc.font={bold:true,size:9};pc.border=bd();
-      DAYS.forEach((d,i)=>{const c=ws.getCell(row,2+i);const rec=lateP.find(r=>r.person===p.name&&r.day===d&&r.period===per);
+      DAYS.forEach((d,i)=>{const c=ws.getCell(row,2+i);const rec=personRecords().find(r=>r.person===p.name&&r.day===d&&r.period===per);
         if(rec){const lines=[rec.subject];if(rec.teacher)lines.push("講師: "+rec.teacher);if(rec.room)lines.push("教室: "+rec.room);if(rec.note)lines.push("※"+rec.note);c.value=lines.join("\n");}
         c.alignment={vertical:'top',wrapText:true};c.font={size:9};c.border=bd();});
     });
@@ -3333,8 +3336,9 @@ async function exportPersonExcel(){
 }
 function exportPersonJson(){
   if(!latePersons.length){alert("学生が登録されていません");return;}
-  const blob=new Blob([JSON.stringify({students:latePersons,records:lateP},null,2)],{type:"application/json"});
-  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="後期学生別データ.json";a.click();
+  const blob=new Blob([JSON.stringify({students:latePersons,records:personRecords()},null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);
+  a.download=`${termLabel(term)}学生別データ.json`;a.click();
 }
 
 /* ========== 空き教室タブ ========== */
@@ -3552,39 +3556,39 @@ function pickJsonFile(onLoad){
 function validClassRecord(r){return r&&typeof r==="object"&&r.grade&&r.world&&r.day&&r.period&&r.subject!=null;}
 
 function importClassJson(){
-  if(!isLate()){alert("後期に切り替えてから読み込んでください");return;}
   pickJsonFile((data,fname)=>{
-    if(!Array.isArray(data)){alert("このファイルはクラス時間割のデータではないようです。\n（後期時間割データ.json を選んでください）");return;}
+    if(!Array.isArray(data)){alert("このファイルはクラス時間割のデータではないようです。\n（時間割データのJSONを選んでください）");return;}
     const recs=data.filter(validClassRecord);
     if(!recs.length){alert("読み込める授業データが見つかりませんでした。");return;}
-    const hasExisting=lateRecords.length>0;
+    const cur=classData();const hasExisting=cur.length>0;
     let mode="replace";
     if(hasExisting){
-      const ans=prompt(`「${fname}」から ${recs.length} コマを読み込みます。\n現在 ${lateRecords.length} コマが登録されています。\n\n方法を数字で選んでください：\n  1 = 置き換え（現在のデータを消して読み込む）\n  2 = 統合（同じ枠は上書き、空き枠は追加）\n\nキャンセルで中止`,"2");
+      const ans=prompt(`「${fname}」から ${recs.length} コマを読み込みます。\n現在 ${cur.length} コマが登録されています。\n\n方法を数字で選んでください：\n  1 = 置き換え（現在のデータを消して読み込む）\n  2 = 統合（同じ枠は上書き、空き枠は追加）\n\nキャンセルで中止`,"2");
       if(ans===null)return;
       if(ans.trim()==="1")mode="replace";
       else if(ans.trim()==="2")mode="merge";
       else{alert("1 か 2 を入力してください。中止しました。");return;}
     }
+    const setClass=(arr)=>{if(isLate())lateRecords=arr;else earlyRecords=arr;};
     if(mode==="replace"){
-      lateRecords=recs.map(normClassRec);
+      setClass(recs.map(normClassRec));
     }else{
       // マージ：grade|world|day|period をキーに「枠ごと」上書き（同枠の複数授業も保持）
       const map={};
-      lateRecords.forEach(r=>{const k=recKeyOf(r);(map[k]=map[k]||[]).push(r);});
+      cur.forEach(r=>{const k=recKeyOf(r);(map[k]=map[k]||[]).push(r);});
       // 読み込んだデータは、同じ枠キーが来たら「その枠を丸ごと差し替え」
       const incoming={};
       recs.forEach(r=>{const nr=normClassRec(r);const k=recKeyOf(nr);(incoming[k]=incoming[k]||[]).push(nr);});
       Object.keys(incoming).forEach(k=>{map[k]=incoming[k];}); // 枠単位で上書き
-      lateRecords=[];Object.values(map).forEach(arr=>arr.forEach(r=>lateRecords.push(r)));
+      const out=[];Object.values(map).forEach(arr=>arr.forEach(r=>out.push(r)));setClass(out);
     }
-    saveLate();
+    if(isLate())saveLate();else saveEarlyEdits();
     // 表示をリセットして反映
     cstate.grade=null;cstate.world=null;
-    offerRegisterCourses(lateRecords);   // 設定に無いコースがあれば追加を確認
-    saveLate();
+    offerRegisterCourses(classData());   // 設定に無いコースがあれば追加を確認
+    if(isLate())saveLate();else saveEarlyEdits();
     rebuildWorldChips();refreshChips("#classPanel",cstate);renderClass();
-    alert(`読み込み完了：現在 ${lateRecords.length} コマになりました。`);
+    alert(`読み込み完了：現在 ${classData().length} コマになりました。`);
   });
 }
 function normClassRec(r){return {grade:+r.grade,world:String(r.world),day:String(r.day),period:+r.period,
@@ -3593,7 +3597,6 @@ function normClassRec(r){return {grade:+r.grade,world:String(r.world),day:String
 function recKeyOf(r){return [r.grade,r.world,r.day,r.period].join("|");}
 
 function importPersonJson(){
-  if(!isLate()){alert("後期に切り替えてから読み込んでください");return;}
   pickJsonFile((data,fname)=>{
     // 形式: {students:[...], records:[...]}
     if(!data||!Array.isArray(data.students)||!Array.isArray(data.records)){
@@ -3624,7 +3627,7 @@ function importPersonJson(){
     }
     saveLateP();
     pstate.person=null;rebuildPersonPick();renderPerson();
-    alert(`読み込み完了：学生 ${latePersons.length} 名・コマ ${lateP.length} 件になりました。`);
+    alert(`読み込み完了：学生 ${latePersons.length} 名・コマ ${personRecords().length} 件になりました。`);
   });
 }
 function normPersonRec(r){return {person:String(r.person),grade:+r.grade||null,day:String(r.day),period:+r.period,
