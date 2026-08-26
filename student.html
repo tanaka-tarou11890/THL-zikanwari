@@ -654,7 +654,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v33</span>
+  <span class="app-ver">v34</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
@@ -739,8 +739,13 @@
     <h3>この枠を他のコマへコピー</h3>
     <div class="ym-sub" id="scSource"></div>
     <div class="ym-sec">
+      <div class="ym-t">コピー先の学年（複数選択可）</div>
+      <div class="ym-d">他の学年にも同じ内容を登録できます。学年を変えると、その学年にあるコースだけが下に表示されます。</div>
+      <div class="chips" id="scGrades"></div>
+    </div>
+    <div class="ym-sec">
       <div class="ym-t">コピー先のコース（複数選択可）</div>
-      <div class="ym-d">同じ学年の他のコースにも、同じ内容をまとめて登録できます（英会話などの合同授業に便利です）。</div>
+      <div class="ym-d">同じ内容をまとめて登録できます（英会話などの合同授業に便利です）。</div>
       <div class="chips" id="scWorlds"></div>
     </div>
     <div class="ym-sec">
@@ -2799,22 +2804,43 @@ function commitFormToEditing(silent){
   return true;
 }
 /* ========== 枠コピー：この枠の複数授業を、他の曜日・時限／他コースへまとめて複製 ========== */
-let scSrc=null;const scSel={worlds:new Set(),slots:new Set()};
+let scSrc=null;const scSel={grades:new Set(),worlds:new Set(),slots:new Set()};
 function openSlotCopy(){
   if(!editing||!editing.recs.length)return;
   scSrc={grade:editGrade(),wShort:cstate.world,day:editing.day,period:editing.period,
     recs:JSON.parse(JSON.stringify(editing.recs))};
+  scSel.grades.clear();scSel.grades.add(scSrc.grade);
   scSel.worlds.clear();scSel.worlds.add(scSrc.wShort);
   scSel.slots.clear();
   document.getElementById("scSource").innerHTML=
     `コピー元：<b>${scSrc.grade}年 ${esc(scSrc.wShort)} ${scSrc.day}曜${scSrc.period}限</b>（${scSrc.recs.length}件の授業）`;
-  renderScWorlds();renderScGrid();
+  renderScGrades();renderScWorlds();renderScGrid();
   document.getElementById("slotCopyMenu").classList.add("show");
 }
 function closeSlotCopy(){document.getElementById("slotCopyMenu").classList.remove("show");}
+/* コピー先の学年を選ぶ */
+function renderScGrades(){
+  const el=document.getElementById("scGrades");
+  if(!el)return;
+  el.innerHTML=gradeList().map(g=>
+    `<div class="chip${scSel.grades.has(g)?' on':''}" data-g="${g}">${g}年</div>`).join("");
+  el.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{
+    const g=+c.dataset.g;
+    if(scSel.grades.has(g))scSel.grades.delete(g);else scSel.grades.add(g);
+    const avail=scAvailWorlds();
+    [...scSel.worlds].forEach(w=>{if(avail.indexOf(w)===-1)scSel.worlds.delete(w);});
+    renderScGrades();renderScWorlds();renderScGrid();});
+}
+/* 選択中の学年すべてに存在するコースだけを対象にする */
+function scAvailWorlds(){
+  const gs=[...scSel.grades];
+  if(!gs.length)return [];
+  const lists=gs.map(g=>(OPT.world_by_grade[String(g)]||[]).map(w=>worldShortFull(w)));
+  return lists[0].filter(w=>lists.every(L=>L.indexOf(w)!==-1));
+}
 function renderScWorlds(){
   const el=document.getElementById("scWorlds");
-  const ws=(OPT.world_by_grade[String(scSrc.grade)]||[]).map(w=>worldShortFull(w));
+  const ws=scAvailWorlds();
   el.innerHTML=ws.map(w=>`<div class="chip${scSel.worlds.has(w)?' on':''}" data-w="${esc(w)}">${esc(w)}</div>`).join("");
   el.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{
     const w=c.dataset.w;
@@ -2829,7 +2855,7 @@ function renderScGrid(){
     DAYS.forEach(d=>{
       const key=d+"|"+p;
       // 選択中のコースのどこかに既存授業があれば「授業あり」
-      const has=[...scSel.worlds].some(w=>cellRecords(scSrc.grade,w,d,p).length>0);
+      const has=[...scSel.grades].some(g=>[...scSel.worlds].some(w=>cellRecords(g,w,d,p).length>0));
       const isSrc=(d===scSrc.day&&p===scSrc.period);
       html+=`<div class="sc-cell${scSel.slots.has(key)?' on':''}" data-k="${key}">${isSrc?'元':'&nbsp;'}${has?'<span class="sc-has">授業あり</span>':'<span class="sc-has">&nbsp;</span>'}</div>`;
     });
@@ -2842,22 +2868,23 @@ function renderScGrid(){
 }
 function execSlotCopy(){
   if(!scSrc)return;
+  if(!scSel.grades.size){alert("コピー先の学年を選んでください。");return;}
   if(!scSel.worlds.size){alert("コピー先のコースを選んでください。");return;}
   if(!scSel.slots.size){alert("コピー先の曜日・時限を選んでください。");return;}
   // コピー先一覧を作成（コピー元自身は除外）
   const dests=[];
-  scSel.worlds.forEach(w=>{scSel.slots.forEach(k=>{
+  scSel.grades.forEach(g=>{scSel.worlds.forEach(w=>{scSel.slots.forEach(k=>{
     const [d,pStr]=k.split("|");const p=+pStr;
-    if(w===scSrc.wShort&&d===scSrc.day&&p===scSrc.period)return;
-    dests.push({w,d,p});});});
+    if(g===scSrc.grade&&w===scSrc.wShort&&d===scSrc.day&&p===scSrc.period)return;
+    dests.push({g,w,d,p});});});});
   if(!dests.length){alert("コピー元と同じコマしか選ばれていません。別のコマを選んでください。");return;}
-  const overwrite=dests.filter(t=>cellRecords(scSrc.grade,t.w,t.d,t.p).length>0);
+  const overwrite=dests.filter(t=>cellRecords(t.g,t.w,t.d,t.p).length>0);
   let msg=`${dests.length}コマにコピーします。`;
   if(overwrite.length)msg+=`\nうち ${overwrite.length}コマ には既に授業があり、上書きされます。`;
   msg+="\nよろしいですか？";
   if(!confirm(msg))return;
   snapshot("枠コピー");
-  dests.forEach(t=>saveCellRecords(scSrc.grade,t.w,t.d,t.p,scSrc.recs));
+  dests.forEach(t=>saveCellRecords(t.g,t.w,t.d,t.p,scSrc.recs));
   closeSlotCopy();closeModal();renderClass();
   setSaved(`枠コピー完了（${dests.length}コマ）`);
   alert(`${dests.length}コマにコピーしました。`);
