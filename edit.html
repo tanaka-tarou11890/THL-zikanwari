@@ -658,7 +658,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v35</span>
+  <span class="app-ver">v36</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
@@ -899,9 +899,13 @@
   <div class="modal">
     <h3 id="pcTitle">授業を登録</h3>
     <div class="mslot" id="pcSlot"></div>
+    <div id="pcCellList" class="cell-list" style="display:none"></div>
+    <div id="pcFormLabel" class="form-label" style="display:none"></div>
     <div class="mfield"><label>科目名</label><div class="sg-wrap"><input id="pcSubject" placeholder="入力すると候補が出ます" autocomplete="off"><div class="sg-list" id="sgPcSubject"></div></div></div>
     <div class="mfield"><label>教員</label><div class="sg-wrap"><input id="pcTeacher" placeholder="入力すると候補が出ます" autocomplete="off"><div class="sg-list" id="sgPcTeacher"></div></div></div>
-    <div class="mfield"><label>教室</label><div class="sg-wrap"><input id="pcRoom" placeholder="入力すると候補が出ます" autocomplete="off"><div class="sg-list" id="sgPcRoom"></div></div></div>
+    <div class="mfield"><label>教室</label><div class="sg-wrap"><input id="pcRoom" placeholder="入力で候補表示（「・」区切りで複数可）" autocomplete="off"><div class="sg-list" id="sgPcRoom"></div></div></div>
+    <div id="pcFreeRoomArea" class="freeroom-area" style="display:none"></div>
+    <div id="pcConflictArea" class="conflict-area" style="display:none"></div>
     <div class="mfield"><label>備考</label><input id="pcNote" placeholder="（任意）" autocomplete="off"></div>
     <div class="mactions">
       <button class="btn ghost" id="pcDelete" style="flex:0 0 auto">削除</button>
@@ -3130,33 +3134,180 @@ document.getElementById("spOverlay").onclick=e=>{if(e.target.id==="spOverlay")cl
 /* 個人コマ編集モーダル */
 let editingPC=null;
 ["pcSubject","pcTeacher","pcRoom"].forEach(id=>setupSuggestGeneric(id,{pcSubject:OPT.subjects,pcTeacher:OPT.teachers,pcRoom:OPT.rooms_clean}[id],{pcSubject:"sgPcSubject",pcTeacher:"sgPcTeacher",pcRoom:"sgPcRoom"}[id]));
-function findPC(d,p){return lateP.find(r=>r.person===pstate.person&&r.day===d&&r.period===p);}
-function openPersonCell(d,p){editingPC={day:d,period:p};
-  const r=findPC(d,p);
-  document.getElementById("pcTitle").textContent=r?"授業を編集":"授業を登録";
-  document.getElementById("pcSlot").textContent=`${esc(pstate.person)} ／ ${d}曜 ${p}限（${PTIME_FULL[p]}）`;
-  document.getElementById("pcSubject").value=r?r.subject:"";
-  document.getElementById("pcTeacher").value=r?r.teacher:"";
-  document.getElementById("pcRoom").value=r?r.room:"";
-  document.getElementById("pcNote").value=r?(r.note||""):"";
-  document.getElementById("pcDelete").style.display=r?"":"none";
-  ["sgPcSubject","sgPcTeacher","sgPcRoom"].forEach(id=>{const el=document.getElementById(id);el.classList.remove("show");el.innerHTML="";});
+/* ===== 学生別の入力：クラス時間割と同じ操作にする =====
+   1コマに複数の授業を登録でき、空き教室の表示と重複の警告も同じように出る。 */
+function pcRecords(d,p){   // そのコマに登録済みの授業（複数可）
+  return personRecords().filter(r=>r.person===pstate.person&&r.day===d&&r.period===p);
+}
+function findPC(d,p){const a=pcRecords(d,p);return a.length?a[0]:null;}
+let pcEdit={idx:0,recs:[]};   // idx: 編集中の何件目か（recs.length なら新規追加）
+
+function openPersonCell(d,p){
+  editingPC={day:d,period:p};
+  pcEdit.recs=JSON.parse(JSON.stringify(pcRecords(d,p)));
+  pcEdit.idx=pcEdit.recs.length?0:0;
+  document.getElementById("pcSlot").textContent=`${esc(pstate.person)} ／ ${d}曜 ${p}限（${PTIME_FULL[p]||""}）`;
+  ["sgPcSubject","sgPcTeacher","sgPcRoom"].forEach(id=>{const el=document.getElementById(id);if(el){el.classList.remove("show");el.innerHTML="";}});
+  renderPcCellList();loadPcForm();
   document.getElementById("pcOverlay").classList.add("show");
-  setTimeout(()=>document.getElementById("pcSubject").focus(),50);}
+  setTimeout(()=>document.getElementById("pcSubject").focus(),50);
+}
+/* この枠に登録済みの授業の一覧（クラス側と同じ見た目・同じクラス名を使う） */
+function renderPcCellList(){
+  const el=document.getElementById("pcCellList");
+  const fl=document.getElementById("pcFormLabel");
+  if(!el)return;
+  if(!pcEdit.recs.length){
+    // まだ1件も無いときも「追加」できるようにしておく（クラス側と同じ操作感）
+    el.style.display="";
+    el.innerHTML=`<button class="cl-add" id="pcAddBtn">＋ この枠に授業を追加</button>`;
+    const a0=el.querySelector("#pcAddBtn");if(a0)a0.onclick=pcAddMore;
+    if(fl){fl.style.display="";fl.innerHTML=`<span class="fl-add">新しい授業を登録</span>`;}
+    document.getElementById("pcTitle").textContent="授業を登録";
+    return;
+  }
+  el.style.display="";
+  const multi=pcEdit.recs.length>1;
+  el.innerHTML=`<div class="cl-head">${multi?'<span class="cl-tag">複数授業</span>':''}この枠の授業（${pcEdit.recs.length}件）</div>`+
+    pcEdit.recs.map((r,i)=>`<div class="cl-item${i===pcEdit.idx?' active':''}" data-i="${i}">
+      <div class="cl-main"><b>${esc(r.subject||"（科目未入力）")}</b>${r.teacher?` ／ ${esc(r.teacher)}`:""}${r.room?` ／ ${esc(r.room)}`:""}</div>
+      <button class="cl-edit" data-i="${i}">編集</button><button class="cl-del" data-i="${i}">削除</button></div>`).join("")+
+    `<button class="cl-add" id="pcAddBtn">＋ この枠に授業を追加</button>`;
+  el.querySelectorAll(".cl-item").forEach(it=>it.onclick=()=>{
+    savePcFormToRec();pcEdit.idx=+it.dataset.i;loadPcForm();renderPcCellList();});
+  el.querySelectorAll(".cl-edit").forEach(b=>b.onclick=(e)=>{e.stopPropagation();
+    savePcFormToRec();pcEdit.idx=+b.dataset.i;loadPcForm();renderPcCellList();});
+  el.querySelectorAll(".cl-del").forEach(b=>b.onclick=(e)=>{e.stopPropagation();
+    const i=+b.dataset.i;pcEdit.recs.splice(i,1);
+    pcEdit.idx=pcEdit.recs.length?Math.min(pcEdit.idx,pcEdit.recs.length-1):0;
+    loadPcForm();renderPcCellList();});
+  const add=el.querySelector("#pcAddBtn");if(add)add.onclick=pcAddMore;
+  if(fl){fl.style.display="";
+    fl.innerHTML=(pcEdit.idx<pcEdit.recs.length)
+      ?`<span class="fl-edit">${pcEdit.idx+1}件目を編集中</span>`
+      :`<span class="fl-add">新しい授業を追加</span>`;}
+  document.getElementById("pcTitle").textContent=multi?"授業を編集（複数）":"授業を編集";
+}
+function pcAddMore(){
+  const subj=document.getElementById("pcSubject").value.trim();
+  if(!subj){alert("先に科目名を入力してください。");
+    document.getElementById("pcSubject").focus();return;}
+  savePcFormToRec();
+  pcEdit.idx=pcEdit.recs.length;      // 末尾＝新規
+  renderPcCellList();loadPcForm();
+  setTimeout(()=>document.getElementById("pcSubject").focus(),30);
+}
+/* フォーム → 編集中のレコード */
+function savePcFormToRec(){
+  const subj=document.getElementById("pcSubject").value.trim();
+  const rec={subject:subj,
+    teacher:document.getElementById("pcTeacher").value.trim(),
+    room:document.getElementById("pcRoom").value.trim(),
+    note:document.getElementById("pcNote").value.trim()};
+  if(!subj&&pcEdit.idx>=pcEdit.recs.length)return;   // 空の新規は追加しない
+  if(pcEdit.idx<pcEdit.recs.length)Object.assign(pcEdit.recs[pcEdit.idx],rec);
+  else pcEdit.recs.push(rec);
+}
+/* 編集中のレコード → フォーム */
+function loadPcForm(){
+  const r=pcEdit.recs[pcEdit.idx]||{subject:"",teacher:"",room:"",note:""};
+  document.getElementById("pcSubject").value=r.subject||"";
+  document.getElementById("pcTeacher").value=r.teacher||"";
+  document.getElementById("pcRoom").value=r.room||"";
+  document.getElementById("pcNote").value=r.note||"";
+  document.getElementById("pcDelete").style.display=pcEdit.recs.length?"":"none";
+  updatePcFreeRooms();updatePcConflict();
+}
+/* その時間に空いている教室（クラス側と同じ考え方。学校全体の使用状況を見る） */
+function updatePcFreeRooms(){
+  const area=document.getElementById("pcFreeRoomArea");
+  if(!area)return;
+  if(!editingPC){area.style.display="none";return;}
+  const {day,period}=editingPC;
+  const used=new Set();
+  classData().forEach(r=>{if(r.day===day&&r.period===period)normRooms(r.room).forEach(rm=>used.add(rm));});
+  personRecords().forEach(r=>{
+    if(r.day!==day||r.period!==period)return;
+    if(r.person===pstate.person)return;      // 本人の枠は除外
+    normRooms(r.room).forEach(rm=>used.add(rm));});
+  const cur=document.getElementById("pcRoom").value.trim();
+  const freeN=ROOMS.filter(rm=>roomCat(rm)==="normal"&&!used.has(rm));
+  const freeS=ROOMS.filter(rm=>roomCat(rm)==="special"&&!used.has(rm));
+  const chip=rm=>{const on=normRooms(cur).includes(rm);
+    return `<span class="fr-chip${on?' on':''}${roomCat(rm)==='special'?' special':''}" data-room="${esc(rm)}">${esc(rm)}</span>`;};
+  let html=`<div class="fr-head">${day}曜${period}限に空いている教室 <span class="fr-sub">クリックで追加／解除（複数可）</span></div>`;
+  if(freeN.length)html+=`<div class="fr-list">${freeN.map(chip).join("")}</div>`;
+  if(freeS.length)html+=`<div class="fr-list">${freeS.map(chip).join("")}</div>`;
+  if(!freeN.length&&!freeS.length)html+=`<div class="fr-none">空いている教室はありません</div>`;
+  area.style.display="";area.innerHTML=html;
+  area.querySelectorAll(".fr-chip").forEach(c=>c.onclick=()=>{
+    const rm=c.dataset.room;
+    const list=normRooms(document.getElementById("pcRoom").value.trim());
+    const i=list.indexOf(rm);
+    if(i>=0)list.splice(i,1);else list.push(rm);
+    document.getElementById("pcRoom").value=list.join("・");
+    updatePcFreeRooms();updatePcConflict();});
+}
+/* 教室・教員の重複を知らせる（クラス側と同じ考え方） */
+function updatePcConflict(){
+  const area=document.getElementById("pcConflictArea");
+  if(!area||!editingPC){if(area)area.style.display="none";return;}
+  const {day,period}=editingPC;
+  const room=document.getElementById("pcRoom").value.trim();
+  const teacher=document.getElementById("pcTeacher").value.trim();
+  const subj=document.getElementById("pcSubject").value.trim();
+  const rooms=normRooms(room);
+  const roomClash=[],teaClash=[];
+  const scan=(list,label)=>{
+    list.forEach(r=>{
+      if(r.day!==day||r.period!==period)return;
+      if(r.person&&r.person===pstate.person)return;         // 本人の枠は除外
+      if(rooms.length&&normRooms(r.room).some(rm=>rooms.includes(rm))&&!sameSubj(r.subject,subj))
+        roomClash.push({who:label(r),subject:r.subject,teacher:r.teacher,room:r.room});
+      if(teacher&&r.teacher&&r.teacher===teacher&&!sameSubj(r.subject,subj))
+        teaClash.push({who:label(r),subject:r.subject,room:r.room});
+    });
+  };
+  scan(classData(),r=>`${r.grade}年 ${worldShortFull(r.world)}`);
+  scan(personRecords(),r=>`${r.person}（学生別）`);
+  if(!roomClash.length&&!teaClash.length){area.style.display="none";area.innerHTML="";return;}
+  let html="";
+  if(roomClash.length)
+    html+=`<div class="cf-block warn"><div class="cf-title"><span class="cf-badge">教室重複</span>${esc(day)}曜${period}限の「${esc(room)}」は別の授業で使用中</div>`+
+      roomClash.map(c=>`<div class="cf-row"><b>${esc(c.who)}</b>：${esc(c.subject)}${c.teacher?`（${esc(c.teacher)}）`:""}</div>`).join("")+`</div>`;
+  if(teaClash.length)
+    html+=`<div class="cf-block warn"><div class="cf-title"><span class="cf-badge">教員重複</span>${esc(teacher)}先生は同じ時間に別の授業</div>`+
+      teaClash.map(c=>`<div class="cf-row"><b>${esc(c.who)}</b>：${esc(c.subject)}${c.room?`／${esc(c.room)}`:""}</div>`).join("")+`</div>`;
+  area.style.display="";area.innerHTML=html;
+}
 function closePersonCell(){document.getElementById("pcOverlay").classList.remove("show");editingPC=null;
-  ["sgPcSubject","sgPcTeacher","sgPcRoom"].forEach(id=>document.getElementById(id).classList.remove("show"));}
+  pcEdit={idx:0,recs:[]};
+  ["pcCellList","pcFormLabel","pcFreeRoomArea","pcConflictArea"].forEach(id=>{
+    const el=document.getElementById(id);if(el){el.style.display="none";el.innerHTML="";}});
+  ["sgPcSubject","sgPcTeacher","sgPcRoom"].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove("show");});}
 document.getElementById("pcCancel").onclick=closePersonCell;
 document.getElementById("pcOverlay").onclick=e=>{if(e.target.id==="pcOverlay")closePersonCell();};
+/* 入力に応じて、空き教室と重複表示を更新する */
+["pcRoom","pcTeacher","pcSubject"].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el)el.addEventListener("input",()=>{updatePcFreeRooms();updatePcConflict();});
+});
 document.getElementById("pcSave").onclick=()=>{
-  const subj=document.getElementById("pcSubject").value.trim();if(!subj){alert("科目名を入力してください");return;}
-  const {day,period}=editingPC;const pinfo=latePersons.find(p=>p.name===pstate.person)||{};
-  let r=findPC(day,period);
-  const data={person:pstate.person,grade:pinfo.grade,day,period,time:PTIME_FULL[period],
-    subject:subj,teacher:document.getElementById("pcTeacher").value.trim(),
-    room:document.getElementById("pcRoom").value.trim(),note:document.getElementById("pcNote").value.trim()};
-  if(r)Object.assign(r,data);else personRecords().push(data);
+  savePcFormToRec();
+  const recs=pcEdit.recs.filter(r=>(r.subject||"").trim());
+  if(!recs.length){alert("科目名を入力してください");return;}
+  const {day,period}=editingPC;
+  const pinfo=latePersons.find(p=>p.name===pstate.person)||{};
+  snapshot("学生別の授業を保存");
+  // その枠を作り直す（複数授業に対応）
+  setPersonRecords(personRecords().filter(r=>!(r.person===pstate.person&&r.day===day&&r.period===period)));
+  recs.forEach(r=>personRecords().push({person:pstate.person,grade:pinfo.grade,day,period,
+    time:PTIME_FULL[period],subject:r.subject.trim(),teacher:(r.teacher||"").trim(),
+    room:(r.room||"").trim(),note:(r.note||"").trim()}));
   saveLateP();renderPerson();closePersonCell();};
 document.getElementById("pcDelete").onclick=()=>{const {day,period}=editingPC;
+  if(pcEdit.recs.length>1&&!confirm("この枠の授業をすべて削除します。よろしいですか？"))return;
+  snapshot("学生別の授業を削除");
   setPersonRecords(personRecords().filter(r=>!(r.person===pstate.person&&r.day===day&&r.period===period)));
   saveLateP();renderPerson();closePersonCell();};
 
