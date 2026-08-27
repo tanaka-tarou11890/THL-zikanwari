@@ -654,7 +654,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v37</span>
+  <span class="app-ver">v38</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
@@ -1216,6 +1216,7 @@ function applyCFG(){
   OPT.world_by_grade=wbg;
   applyCourseColors();
   NOW=nowInfo();
+  try{updateNowLabel();}catch(e){}
 }
 /* コース色は数が可変なので、設定内容からCSSを生成して差し込む */
 function applyCourseColors(){
@@ -1805,7 +1806,24 @@ function nowInfo(){const d=new Date(),min=d.getHours()*60+d.getMinutes();
   let period=null;for(const p of PERIODS){const r=PRANGE[p];if(r&&min>=r[0]&&min<=r[1]){period=p;break;}}
   return{day,period};}
 let NOW=nowInfo();
-document.getElementById("nowLabel").textContent=(NOW.day?`今日は${NOW.day}曜`:"今日は土日")+(NOW.period?` ・ ${NOW.period}限`:(NOW.day?" ・ 授業時間外":""));
+/* 「今日は○曜・○限」の表示。設定（時限の時刻）が読み込まれてから確定するため関数にしておき、
+   設定の反映後と、1分ごとの経過でも更新する。 */
+function updateNowLabel(){
+  const el=document.getElementById("nowLabel");
+  if(!el)return;
+  NOW=nowInfo();
+  // 授業のない曜日は、時限を出さない（「日曜なのに2限」とならないように）
+  el.textContent=NOW.day
+    ? `今日は${NOW.day}曜` + (NOW.period?` ・ ${NOW.period}限`:" ・ 授業時間外")
+    : "今日は授業のない曜日";
+}
+updateNowLabel();
+/* 時限が変わったら、表示と「現在のコマ」の強調を切り替える（1分ごとに確認） */
+setInterval(()=>{
+  const before=NOW.day+"|"+NOW.period;
+  updateNowLabel();
+  if(before!==NOW.day+"|"+NOW.period){try{renderAll();}catch(e){logErr("時限の切り替え表示",e);}}
+},60000);
 
 // ===== サジェスト（手入力＋候補表示） =====
 const SG_SOURCES={mSubject:OPT.subjects,mTeacher:OPT.teachers,mRoom:OPT.rooms_clean};
