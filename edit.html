@@ -627,6 +627,9 @@
     font-weight:800;padding:4px 10px;border-radius:12px;white-space:nowrap;cursor:pointer}
   .pub-badge{display:inline-flex;align-items:center;gap:5px;background:#F5A623;color:#3D2B00;
     font-size:.74rem;font-weight:800;padding:4px 10px;border-radius:12px;letter-spacing:.02em;white-space:nowrap}
+  /* 空き教室タブ：週間表で「空き」「使用中」を強調する */
+  table.week td.slot.fr-hit{box-shadow:inset 0 0 0 2px var(--accent);background:var(--accent-soft,#eaf3f7)}
+  table.week td.slot.empty.fr-hit .room-free-mark{color:var(--accent);font-weight:800}
   #yearNotice{display:none;position:fixed;inset:0;z-index:9999;background:linear-gradient(160deg,#1E5B3C 0%,#134129 100%);align-items:center;justify-content:center;padding:24px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   #yearNotice .yn-card{max-width:440px;width:100%;background:#fff;border-radius:18px;padding:40px 32px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.25)}
   #yearNotice .yn-badge{font-family:"Cinzel",serif;font-weight:700;letter-spacing:.35em;color:#1E5B3C;font-size:1.1rem;margin-bottom:20px}
@@ -658,7 +661,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v38</span>
+  <span class="app-ver">v40</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
@@ -779,9 +782,8 @@
   <div class="tabs">
     <div class="tab on" data-tab="class">クラス時間割</div>
     <div class="tab" data-tab="person">学生別</div>
-    <div class="tab" data-tab="free">空き教室</div>
+    <div class="tab" data-tab="free">教室</div>
     <div class="tab" data-tab="slot">時限別一覧</div>
-    <div class="tab" data-tab="room">教室別</div>
     <div class="tab" data-tab="config" id="tabConfig" style="display:none">設定</div>
   </div>
 
@@ -812,6 +814,8 @@
   <div id="freeView" style="display:none">
     <div class="panel">
       <div class="filters">
+        <div class="filter-label">表示</div><div class="chips" id="freeModeChips"></div>
+        <div class="filter-label">教室</div><div class="chips" id="freeRoomChips"></div>
         <div class="filter-label">曜日</div><div class="chips" id="freeDayChips"></div>
         <div class="filter-label">時限</div><div class="chips" id="freePeriodChips"></div>
       </div>
@@ -829,13 +833,6 @@
     <div id="slotNote"></div><div id="slotOut"></div>
   </div>
 
-  <div id="roomView" style="display:none">
-    <div class="panel">
-      <div class="filter-label" style="padding-top:0;margin-bottom:8px">教室を選択</div>
-      <div class="chips" id="roomPick"></div>
-    </div>
-    <div id="roomNote"></div><div id="roomOut"></div>
-  </div>
 
   <div id="configView" style="display:none">
     <div class="panel"><div id="cfgBody"></div></div>
@@ -1273,7 +1270,6 @@ function rebuildFromCFG(){
   try{buildFreeChips();}catch(e){logErr("空き教室の条件の作り直し",e);}
   try{buildSlotChips();}catch(e){logErr("時限別の条件の作り直し",e);}
   try{rebuildWorldChips();}catch(e){logErr("コース一覧の作り直し",e);}
-  try{rebuildRoomPick();}catch(e){logErr("教室一覧の作り直し",e);}
   try{rebuildPersonPick();}catch(e){logErr("学生一覧の作り直し",e);}
   applyViewerSelection();
 }
@@ -3364,7 +3360,7 @@ function exportPersonJson(){
 }
 
 /* ========== 空き教室タブ ========== */
-const fstate={day:null,period:null};
+const fstate={day:null,period:null,mode:"free",room:null};
 function roomCat(rm){return SPECIAL_ROOMS.includes(rm)?"special":"normal";}
 const ROOM_ALIAS={"エアーラインルーム":"エアラインルーム","403・404":"403・4","カフェ":"1Fカフェ"};
 /* 教室文字列を「、」「,」「・」「/」「／」区切りで分解して正規化する。
@@ -3388,32 +3384,101 @@ function roomUsage(grade){const use={};ROOMS.forEach(rm=>use[rm]={});
   classData().forEach(r=>{if(grade&&r.grade!==grade)return;normRooms(r.room).forEach(rm=>{
     (use[rm][r.day+"-"+r.period]=use[rm][r.day+"-"+r.period]||[]).push(r);});});return use;}
 function buildFreeChips(){
+  // 表示の切り替え（空き／使用中）。どちらか必ず選ばれた状態にする
+  const mel=document.getElementById("freeModeChips");
+  if(mel){
+    const opts=[{v:"free",l:"空き教室"},{v:"busy",l:"使用中"}];
+    mel.innerHTML=opts.map(o=>
+      `<div class="chip${fstate.mode===o.v?' on':''}" data-key="mode" data-val="${o.v}">${o.l}</div>`).join("");
+    mel.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{
+      fstate.mode=c.dataset.val;renderFree();refreshChips("#freeView",fstate);});
+  }
+  // 教室を1つ選ぶと、その教室の1週間を表で見られる
+  makeChips("freeRoomChips",ROOMS.map(rm=>({label:rm,val:rm})),"room",null,fstate,()=>{renderFree();refreshChips("#freeView",fstate);});
   makeChips("freeDayChips",DAYS.map(d=>({label:d,val:d})),"day",null,fstate,()=>{renderFree();refreshChips("#freeView",fstate);});
   makeChips("freePeriodChips",PERIODS.map(p=>({label:p+"限",val:p})),"period",null,fstate,()=>{renderFree();refreshChips("#freeView",fstate);});
 }
 function roomCard(rm,extra,busy){return `<div class="room-card ${busy?'busy-card':roomCat(rm)}"><span class="room-name">${esc(rm)}</span>${extra||""}</div>`;}
-function renderFree(){const note=document.getElementById("freeNote"),out=document.getElementById("freeOut");
-  const use=roomUsage();const gl="";
+function renderFree(){
+  const note=document.getElementById("freeNote"),out=document.getElementById("freeOut");
   const termL=termLabel(term);
+  const mode=fstate.mode||"free";            // free=空き / busy=使用中
+  const label=(mode==="busy")?"使用中":"空き";
+  const use=roomUsage();
+  const rmSel=fstate.room;                    // 教室を1つ選ぶと週間表になる
+
+  /* 教室を選んでいるとき：クラス時間割と同じ週間表で見せる */
+  if(rmSel){
+    const map={};
+    classData().forEach(r=>{if(normRooms(r.room).includes(rmSel)){(map[r.day+"-"+r.period]=map[r.day+"-"+r.period]||[]).push(r);}});
+    const usedCnt=Object.keys(map).length, total=DAYS.length*PERIODS.length;
+    note.innerHTML=`<div class="mode-note f"><b>${esc(rmSel)}</b> の1週間 ／ ${termL}　`+
+      `使用 ${usedCnt} コマ ・ 空き ${total-usedCnt} コマ　`+
+      `<span style="color:var(--ink-soft)">${mode==="busy"?"使用中のコマを強調しています":"空いているコマを強調しています"}</span></div>`;
+    let thead='<tr><th class="corner">時限</th>'+DAYS.map(dd=>`<th class="${dd===NOW.day?'todaycol':''}">${dd}</th>`).join("")+'</tr>';
+    let tbody=PERIODS.map(p=>{
+      const tds=DAYS.map(dd=>{
+        const cell=map[dd+"-"+p];
+        const isNow=(dd===NOW.day&&p===NOW.period);
+        const nc=isNow?" nowcell":"";
+        if(!cell){
+          const hi=(mode==="free")?" fr-hit":"";
+          return `<td class="slot empty${nc}${hi}"><div class="room-free-mark">空き</div></td>`;
+        }
+        const hi=(mode==="busy")?" fr-hit":"";
+        // 同じコマに別の科目が入っていたら、重複の可能性として印を付ける
+        const dup=cell.length>1&&[...new Set(cell.map(c=>c.subject))].length>1;
+        return `<td class="slot${nc}${hi}${dup?' room-dup':''}">`+cell.map(r=>
+          `<div class="slot-card"><div class="s-subj">${esc(r.subject)}</div>`+
+          `<div class="s-meta">${r.grade}年 ${esc(worldShortFull(r.world))}</div>`+
+          (r.teacher?`<div class="s-meta">${esc(r.teacher)}</div>`:"")+`</div>`).join("")+`</td>`;
+      }).join("");
+      return `<tr><td class="period-cell"><div class="pnum">${p}限</div><div class="ptime">${PTIME_FULL[p]||""}</div></td>${tds}</tr>`;
+    }).join("");
+    out.innerHTML=`<div class="grid-head"><span class="gtitle">${esc(rmSel)}</span>`+
+      `<span class="gworld">${termL} ／ 使用 ${usedCnt} ・ 空き ${total-usedCnt}</span></div>`+
+      `<div class="table-scroll"><table class="week"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>`;
+    return;
+  }
+
+  /* 教室を選んでいないとき：曜日×時限を選んで、その時間の一覧を見せる */
   const day=fstate.day,period=fstate.period;
-  if(!day||!period){const hint=(NOW.day&&NOW.period)?`いまは ${NOW.day}曜${NOW.period}限 です。`:"";
-    note.innerHTML=`<div class="mode-note f"><b>空き教室を探す（${termL}）</b>　曜日と時限を選ぶと、その時間に空いている教室が表示されます。${hint}${gl}</div>`;
-    out.innerHTML='<div class="empty"><div class="big">曜日と時限を選んでください</div><div>例：「金」＋「3限」で、空いている教室が一覧表示されます。</div></div>';return;}
+  if(!day||!period){
+    const hint=(NOW.day&&NOW.period)?`いまは ${NOW.day}曜${NOW.period}限 です。`:"";
+    note.innerHTML=`<div class="mode-note f"><b>教室の使用状況（${termL}）</b>　`+
+      `教室を選ぶと、その教室の1週間を表で確認できます。曜日と時限を選ぶと、その時間の教室一覧が出ます。${hint}</div>`;
+    out.innerHTML='<div class="empty"><div class="big">教室、または「曜日＋時限」を選んでください</div>'+
+      '<div>教室を選ぶ → その教室が週のどこで使われているか<br>曜日＋時限を選ぶ → その時間に空いている（使用中の）教室の一覧</div></div>';
+    return;
+  }
   const key=day+"-"+period;
   const freeNormal=ROOMS.filter(rm=>roomCat(rm)==="normal"&&!use[rm][key]);
   const freeSpecial=ROOMS.filter(rm=>roomCat(rm)==="special"&&!use[rm][key]);
   const busy=ROOMS.filter(rm=>use[rm][key]).map(rm=>({rm,subs:use[rm][key]}));
-  note.innerHTML=`<div class="mode-note f"><b>${day}曜 ${period}限</b>（${PTIME_FULL[period]}）に空いている教室 ${gl}／ ${termL}</div>`;
-  let html=`<div class="grid-head"><span class="gtitle">${day}曜 ${period}限</span><span class="gworld">空き ${freeNormal.length+freeSpecial.length} 室 / 全 ${ROOMS.length} 室</span></div>`;
-  html+='<div class="free-section"><div class="fs-label">空いている教室（一般）</div>';
-  html+= freeNormal.length?'<div class="room-list">'+freeNormal.map(rm=>roomCard(rm)).join("")+'</div>':'<div class="fs-none">空き教室はありません</div>';
-  html+='</div>';
-  if(freeSpecial.length)html+='<div class="free-section"><div class="fs-label">空いている特別教室</div><div class="room-list">'+freeSpecial.map(rm=>roomCard(rm)).join("")+'</div></div>';
-  html+='<div class="free-section"><div class="fs-label busy-label">使用中の教室</div>';
-  html+= busy.length?'<div class="room-list">'+busy.map(b=>roomCard(b.rm,`<span class="room-busy">${esc(b.subs[0].subject)}${b.subs.length>1?" 他":""}</span>`,true)).join("")+'</div>':'<div class="fs-none">使用中の教室はありません</div>';
-  html+='</div>';out.innerHTML=html;}
+  const freeCnt=freeNormal.length+freeSpecial.length;
+  note.innerHTML=`<div class="mode-note f"><b>${day}曜 ${period}限</b>（${PTIME_FULL[period]||""}）／ ${termL}　`+
+    `空き ${freeCnt} 室 ・ 使用中 ${busy.length} 室</div>`;
+  let html=`<div class="grid-head"><span class="gtitle">${day}曜 ${period}限</span>`+
+    `<span class="gworld">${label}を表示中 ／ 全 ${ROOMS.length} 室</span></div>`;
+  if(mode==="free"){
+    html+='<div class="free-section"><div class="fs-label">空いている教室（一般）</div>';
+    html+= freeNormal.length?'<div class="room-list">'+freeNormal.map(rm=>roomCard(rm)).join("")+'</div>'
+                            :'<div class="fs-none">空き教室はありません</div>';
+    html+='</div>';
+    if(freeSpecial.length)
+      html+='<div class="free-section"><div class="fs-label">空いている特別教室</div><div class="room-list">'+
+            freeSpecial.map(rm=>roomCard(rm)).join("")+'</div></div>';
+  }else{
+    html+='<div class="free-section"><div class="fs-label busy-label">使用中の教室</div>';
+    html+= busy.length?'<div class="room-list">'+busy.map(b=>roomCard(b.rm,
+             `<span class="room-busy">${esc(b.subs[0].subject)}${b.subs.length>1?" 他":""}</span>`,true)).join("")+'</div>'
+                      :'<div class="fs-none">使用中の教室はありません</div>';
+    html+='</div>';
+  }
+  out.innerHTML=html;
+}
 
-/* ========== 時限別一覧ビュー（全コース横断） ========== */
+/* ========== 時限別一覧タブ ========== */
 const sstate={day:null,period:null};
 function buildSlotChips(){
   makeChips("slotDayChips",DAYS.map(d=>({label:d,val:d})),"day",null,sstate,()=>{renderSlot();refreshChips("#slotView",sstate);});
@@ -3459,38 +3524,11 @@ function renderSlot(){
 }
 
 /* ========== 教室別ビュー（特定教室の週間使用状況） ========== */
-const rstate={room:null};
-function rebuildRoomPick(){
-  const el=document.getElementById("roomPick");
-  el.innerHTML=ROOMS.map(rm=>`<div class="chip${rstate.room===rm?' on':''}" data-room="${esc(rm)}">${esc(rm)}</div>`).join("");
-  el.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{rstate.room=(rstate.room===c.dataset.room)?null:c.dataset.room;rebuildRoomPick();renderRoom();});
-}
-function renderRoom(){
-  const note=document.getElementById("roomNote"),out=document.getElementById("roomOut");
-  const termL=termLabel(term);
-  if(!rstate.room){
-    note.innerHTML=`<div class="mode-note"><b>教室別の使用状況（${termL}）</b>　教室を選ぶと、その教室が週のどこで使われているかを週間表で確認できます。空いている枠を狙って当て込めます。</div>`;
-    out.innerHTML='<div class="empty"><div class="big">教室を選んでください</div></div>';return;}
-  const rm=rstate.room;
-  // その教室を使う授業を曜日×時限で集計
-  const map={};let used=0;
-  classData().forEach(r=>{if(normRooms(r.room).includes(rm)){(map[r.day+"-"+r.period]=map[r.day+"-"+r.period]||[]).push(r);}});
-  Object.values(map).forEach(a=>used+=a.length);
-  note.innerHTML=`<div class="mode-note"><b>${esc(rm)}</b> の使用状況 ／ ${termL}　使用 ${Object.keys(map).length} コマ`+(Object.keys(map).length?'':'（未使用）')+`</div>`;
-  let thead='<tr><th class="corner">時限</th>'+DAYS.map(d=>`<th class="${d===NOW.day?'todaycol':''}">${d}</th>`).join("")+'</tr>';
-  let tbody=PERIODS.map(p=>{
-    let tds=DAYS.map(d=>{const cell=map[d+"-"+p];const isNow=(d===NOW.day&&p===NOW.period);const nc=isNow?" nowcell":"";
-      if(!cell)return `<td class="slot empty${nc}"><div class="room-free-mark">空き</div></td>`;
-      const dup=cell.length>1&&[...new Set(cell.map(c=>c.subject))].length>1;
-      return `<td class="slot${nc}${dup?' room-dup':''}">`+cell.map(r=>`<div class="slot-card"><div class="s-subj">${esc(r.subject)}</div><div class="s-line">${r.grade}年 ${esc(worldShortFull(r.world))}</div>${r.teacher?`<div class="s-line">${esc(r.teacher)}</div>`:""}</div>`).join("")+(dup?'<div class="dup-mark">⚠重複</div>':'')+'</td>';
-    }).join("");
-    return `<tr><td class="period-cell">${p}限<span class="ptime">${PTIME_FULL[p]}</span></td>${tds}</tr>`;
-  }).join("");
-  out.innerHTML=`<div class="grid-head"><span class="gtitle">${esc(rm)}</span><span class="gworld">${termL} / 週間使用状況</span></div><div class="table-scroll"><table class="week">${`<thead>${thead}</thead><tbody>${tbody}</tbody>`}</table></div>`;
-}
-// ツールの週間表と同じ「縦＝時限・横＝曜日」を学年×コースごとに縦に積む
-async function exportExcel(){exportClassExcel("late");}
-async function exportEarlyExcel(){exportClassExcel("early");}
+/* 教室の閲覧は「教室」タブ（renderFree）に統合した */
+
+/* ===== Excel出力 ===== */
+function exportEarlyExcel(){exportClassExcel("early");}
+function exportExcel(){exportClassExcel("late");}
 async function exportClassExcel(which){
   const isEarly=(which==="early");
   const data=isEarly?earlyData():lateRecords;
@@ -3558,6 +3596,7 @@ async function exportClassExcel(which){
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`${schoolYear}年度${termName}_${brandFile()}時間割.xlsx`;a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
+
 function exportJson(){if(!lateRecords.length){alert("後期の授業がまだ登録されていません");return;}
   const blob=new Blob([JSON.stringify(lateRecords,null,2)],{type:"application/json"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="後期時間割データ.json";a.click();}
@@ -3668,18 +3707,15 @@ function setTerm(t){term=t;
   // 前期・後期とも常に編集できるため、モードの切り替えは不要
   updatePublishBadge();
   rebuildWorldChips();rebuildPersonPick();
-  rstate.room=null;
-  rebuildRoomPick();
-  renderClass();renderPerson();renderFree();renderSlot();renderRoom();}
+  renderClass();renderPerson();renderFree();renderSlot();}
 document.getElementById("termEarly").onclick=()=>setTerm("early");
 document.getElementById("termLate").onclick=()=>setTerm("late");
 
 /* ========== タブ切替 ========== */
 function switchTab(t){document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("on",x.dataset.tab===t));
-  ["class","person","free","slot","room","config"].forEach(v=>{const el=document.getElementById(v+"View");if(el)el.style.display=(v===t)?"":"none";});
+  ["class","person","free","slot","config"].forEach(v=>{const el=document.getElementById(v+"View");if(el)el.style.display=(v===t)?"":"none";});
   if(t==="class")renderClass();else if(t==="person")renderPerson();else if(t==="free")renderFree();
-  else if(t==="slot")renderSlot();else if(t==="room"){rebuildRoomPick();renderRoom();}
-  else if(t==="config")openConfigTab();}
+  else if(t==="slot")renderSlot();else if(t==="config")openConfigTab();}
 document.querySelectorAll(".tab").forEach(tab=>tab.onclick=()=>switchTab(tab.dataset.tab));
 
 /* ========== サーバー同期（Vercel + Upstash Redis） ==========
@@ -3755,8 +3791,8 @@ function migrateWorldKeys(){
 }
 function renderAll(){
   normalizeNotation();
-  rebuildWorldChips();rebuildPersonPick();rebuildRoomPick();
-  renderClass();renderPerson();renderFree();renderSlot();renderRoom();
+  rebuildWorldChips();rebuildPersonPick();
+  renderClass();renderPerson();renderFree();renderSlot();
 }
 /* ========== 年度メニュー ========== */
 function openYearMenu(){
@@ -4105,7 +4141,7 @@ loadCfgLocal();            // 端末に残っている設定（オフライン�
 applyCFG();applyBranding();
 rebuildFromCFG();
 updateYearBadge();
-renderClass();renderPerson();renderFree();renderSlot();renderRoom();
+renderClass();renderPerson();renderFree();renderSlot();
 setupTabVisibility();      // 設定タブは編集画面だけに出す
 updateBackupNote();updateUndoBtn();updateErrBadge();renderNotice();
 /* バックアップ表示をクリックしたら、その場で書き出せるようにする */
