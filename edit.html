@@ -661,7 +661,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v40</span>
+  <span class="app-ver">v41</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
@@ -3426,12 +3426,18 @@ function renderFree(){
           return `<td class="slot empty${nc}${hi}"><div class="room-free-mark">空き</div></td>`;
         }
         const hi=(mode==="busy")?" fr-hit":"";
-        // 同じコマに別の科目が入っていたら、重複の可能性として印を付ける
-        const dup=cell.length>1&&[...new Set(cell.map(c=>c.subject))].length>1;
-        return `<td class="slot${nc}${hi}${dup?' room-dup':''}">`+cell.map(r=>
-          `<div class="slot-card"><div class="s-subj">${esc(r.subject)}</div>`+
-          `<div class="s-meta">${r.grade}年 ${esc(worldShortFull(r.world))}</div>`+
-          (r.teacher?`<div class="s-meta">${esc(r.teacher)}</div>`:"")+`</div>`).join("")+`</td>`;
+        // 教室の使われ方が分かればよいので、科目名と講師名だけを表示する。
+        // 同じ科目・同じ講師が複数のコースに登録されていても1件にまとめる。
+        const uniq=[];
+        cell.forEach(r=>{
+          const k=normSubj(r.subject)+"|"+(r.teacher||"").trim();
+          if(!uniq.some(u=>u.k===k))uniq.push({k,subject:r.subject,teacher:r.teacher});
+        });
+        // まとめた結果が2件以上なら、別の授業が同じ教室に入っている＝重複の可能性
+        const dup=uniq.length>1;
+        return `<td class="slot${nc}${hi}${dup?' room-dup':''}">`+uniq.map(u=>
+          `<div class="slot-card"><div class="s-subj">${esc(u.subject)}</div>`+
+          (u.teacher?`<div class="s-meta">${esc(u.teacher)}</div>`:"")+`</div>`).join("")+`</td>`;
       }).join("");
       return `<tr><td class="period-cell"><div class="pnum">${p}限</div><div class="ptime">${PTIME_FULL[p]||""}</div></td>${tds}</tr>`;
     }).join("");
