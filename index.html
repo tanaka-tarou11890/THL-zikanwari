@@ -657,7 +657,7 @@
   <span class="integ-badge" id="integBadge" style="display:none"></span>
   <button class="btn ghost btn-sm" id="syncReloadBtn" style="display:none;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4)">最新に更新</button>
   <span class="viewer-tag" id="viewerTag" style="display:none">閲覧版</span>
-  <span class="app-ver">v41</span>
+  <span class="app-ver">v42</span>
   <span class="now" id="nowLabel"></span>
   <span class="saved" id="savedLabel"></span>
 </div></header>
@@ -3422,18 +3422,25 @@ function renderFree(){
           return `<td class="slot empty${nc}${hi}"><div class="room-free-mark">空き</div></td>`;
         }
         const hi=(mode==="busy")?" fr-hit":"";
-        // 教室の使われ方が分かればよいので、科目名と講師名だけを表示する。
-        // 同じ科目・同じ講師が複数のコースに登録されていても1件にまとめる。
+        // 同じ科目・同じ講師は1件にまとめる（合同授業がコース数だけ並ばないように）。
+        // まとめた結果が1コースだけの授業は、学年とコース名も添えて分かりやすくする。
         const uniq=[];
         cell.forEach(r=>{
           const k=normSubj(r.subject)+"|"+(r.teacher||"").trim();
-          if(!uniq.some(u=>u.k===k))uniq.push({k,subject:r.subject,teacher:r.teacher});
+          const hit=uniq.find(u=>u.k===k);
+          if(hit){hit.recs.push(r);}
+          else uniq.push({k,subject:r.subject,teacher:r.teacher,recs:[r]});
         });
         // まとめた結果が2件以上なら、別の授業が同じ教室に入っている＝重複の可能性
         const dup=uniq.length>1;
-        return `<td class="slot${nc}${hi}${dup?' room-dup':''}">`+uniq.map(u=>
-          `<div class="slot-card"><div class="s-subj">${esc(u.subject)}</div>`+
-          (u.teacher?`<div class="s-meta">${esc(u.teacher)}</div>`:"")+`</div>`).join("")+`</td>`;
+        return `<td class="slot${nc}${hi}${dup?' room-dup':''}">`+uniq.map(u=>{
+          // 対象が1コースだけなら「1年 ホテル」を出す。複数コースなら出さない
+          const keys=[...new Set(u.recs.map(r=>r.grade+"|"+worldShortFull(r.world)))];
+          const only=(keys.length===1)?`${u.recs[0].grade}年 ${worldShortFull(u.recs[0].world)}`:"";
+          return `<div class="slot-card"><div class="s-subj">${esc(u.subject)}</div>`+
+            (only?`<div class="s-meta">${esc(only)}</div>`:"")+
+            (u.teacher?`<div class="s-meta">${esc(u.teacher)}</div>`:"")+`</div>`;
+        }).join("")+`</td>`;
       }).join("");
       return `<tr><td class="period-cell"><div class="pnum">${p}限</div><div class="ptime">${PTIME_FULL[p]||""}</div></td>${tds}</tr>`;
     }).join("");
