@@ -642,6 +642,11 @@
   .setup-head h2{margin:8px 0 10px;font-size:1.6rem;color:#202124;font-weight:500}
   .setup-head p{font-size:.88rem;color:#5F6368;line-height:1.8;margin:0}
 </style>
+<!-- Vercel Web Analytics -->
+<script>
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
 <header id="appHeader"><div class="wrap">
@@ -943,7 +948,7 @@ var VIEWER_WORLD=(function(){try{const m=location.search.match(/[?&]w=([^&]+)/);
   return decodeURIComponent(m[1]);}catch(e){return null;}})();
 var VIEWER_GRADE=(function(){try{const m=location.search.match(/[?&]g=([1-4])(?:[^0-9]|$)/);return m?+m[1]:null;}catch(e){return null;}})();
 /* 年度付き閲覧URL（?y=2026）。閲覧時にサーバーの現年度と一致しなければ案内を表示し、時間割は見せない。
-   卒業生などが古いURL・素のURLで最新年度を見続けないための仕組み。 */
+   ��業生などが古いURL・素のURLで最新年度を見続けないための仕組み。 */
 var VIEWER_YEAR=(function(){try{const m=location.search.match(/[?&]y=(\d{4})(?:[^0-9]|$)/);return m?+m[1]:null;}catch(e){return null;}})();
 /* ===== PWA ===== */
 // Service Worker登録（https時のみ。file://では何もしない）
@@ -1136,7 +1141,7 @@ function snapshot(label){
   }catch(e){logErr("snapshot",e);}
 }
 function undoLast(){
-  if(!UNDO.length){alert("元に戻せる操作がありません。");return;}
+  if(!UNDO.length){alert("元に戻せる操作が��りません。");return;}
   const s=UNDO.pop();
   if(!confirm(`直前の操作「${s.label}」を取り消して、その前の状態に戻します。\nよろしいですか？`)){UNDO.push(s);return;}
   earlyRecords=s.early;lateRecords=s.late;latePersons=s.persons;lateP=s.lateP;earlyP=s.earlyP;
@@ -1269,7 +1274,7 @@ function rebuildFromCFG(){
   try{rebuildPersonPick();}catch(e){logErr("学生一覧の作り直し",e);}
   applyViewerSelection();
 }
-/* コースURL（?w=）を、設定が届いてから表示名に解決して選択状態にする */
+/* コースURL（?w=）を、設定が��いてから表示名に解決して選択状態にする */
 function applyViewerSelection(){
   if(!VIEWER_MODE||!VIEWER_WORLD)return;
   const c=courseOf(VIEWER_WORLD);
@@ -1907,7 +1912,7 @@ function updateCopyArea(){
   const area=document.getElementById("copyArea");
   const subj=document.getElementById("mSubject").value.trim();
   if(!subj){area.style.display="none";area.innerHTML="";return;}
-  // 前期・後期から同名授業を収集（教員・教室の組み合わせで重複排除）
+  // 前期・後期から同名授���を収集（教員・教室の組み合わせで重複排除）
   const seen=new Set();const cands=[];
   // クラス分け表記など教員名でない値を弾く
   function looksLikeTeacher(t){if(!t)return true;return !(t.includes("：")||t.includes(":"))&&!/^[0-9０-９\s・\/／]+$/.test(t);}
@@ -2796,7 +2801,7 @@ function renderCellList(){
       <div class="cl-main"><b>${esc(r.subject)}</b>${r.teacher?` ／ ${esc(r.teacher)}`:""}${r.room?` ／ ${esc(r.room)}`:""}</div>
       <button class="cl-edit" data-i="${i}">編集</button><button class="cl-del" data-i="${i}">削除</button></div>`).join("")+
     `<button class="cl-add" id="clAddBtn">＋ この枠に授業を追加</button>`+
-    `<button class="cl-add" id="slotCopyBtn" style="margin-top:4px">⧉ この枠を他のコマへコピー</button>`;
+    `<button class="cl-add" id="slotCopyBtn" style="margin-top:4px">⧉ この��を他のコマへコピー</button>`;
   const scb=el.querySelector("#slotCopyBtn");if(scb)scb.onclick=(e)=>{e.stopPropagation();openSlotCopy();};
   el.querySelectorAll(".cl-edit").forEach(b=>b.onclick=(e)=>{e.stopPropagation();editing.idx=+b.dataset.i;loadFormFromEditing();renderCellList();updateConflict();updateCopyArea();});
   el.querySelectorAll(".cl-item").forEach(it=>it.onclick=()=>{editing.idx=+it.dataset.i;loadFormFromEditing();renderCellList();updateConflict();updateCopyArea();});
@@ -3776,7 +3781,7 @@ function offerRegisterCourses(records){
   if(!unknown.length)return 0;
   const lines=unknown.map(u=>`・${u.name}（${u.grades.join("・")}年）`).join("\n");
   const msg=`読み込んだデータに、設定に登録されていないコースが ${unknown.length}件 ありました。\n\n${lines}\n\n`+
-    `このまま設定に追加すると、コースの絞り込みボタンに表示され、色や正式名称も設定できるようになります。\n追加しますか？\n（「キャンセル」を選ぶと、時間割には表示されますが絞り込みはできません）`;
+    `このまま設定に追加すると、コースの絞り込みボタンに表示され、色や正��名称も設定できるようになります。\n追加しますか？\n（「キャンセル」を選ぶと、時間割には表示されますが絞り込みはできません）`;
   if(!confirm(msg))return 0;
   const n=addCoursesToConfig(unknown);
   if(n){

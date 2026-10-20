@@ -646,6 +646,11 @@
   .setup-head h2{margin:8px 0 10px;font-size:1.6rem;color:#202124;font-weight:500}
   .setup-head p{font-size:.88rem;color:#5F6368;line-height:1.8;margin:0}
 </style>
+<!-- Vercel Web Analytics -->
+<script>
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
 <header id="appHeader"><div class="wrap">
@@ -946,7 +951,7 @@ var VIEWER_STUDENT_KEY=(function(){try{const m=location.search.match(/[?&]s=([a-
 var VIEWER_WORLD=(function(){try{const m=location.search.match(/[?&]w=([^&]+)/);if(!m)return null;
   return decodeURIComponent(m[1]);}catch(e){return null;}})();
 var VIEWER_GRADE=(function(){try{const m=location.search.match(/[?&]g=([1-4])(?:[^0-9]|$)/);return m?+m[1]:null;}catch(e){return null;}})();
-/* 年度付き閲覧URL（?y=2026）。閲覧時にサーバーの現年度と一致しなければ案内を表示し、時間割は見せない。
+/* 年度付き閲覧URL（?y=2026）。閲覧時にサーバーの現年度と一致しなければ案内���表示し、時間割は見せない。
    卒業生などが古いURL・素のURLで最新年度を見続けないための仕組み。 */
 var VIEWER_YEAR=(function(){try{const m=location.search.match(/[?&]y=(\d{4})(?:[^0-9]|$)/);return m?+m[1]:null;}catch(e){return null;}})();
 /* ===== PWA ===== */
@@ -968,7 +973,7 @@ function genKey(){const cs="abcdefghijklmnopqrstuvwxyz0123456789";let s="";
   do{s="";try{const a=new Uint8Array(12);crypto.getRandomValues(a);for(let i=0;i<12;i++)s+=cs[a[i]%36];}
     catch(e){for(let i=0;i<12;i++)s+=cs[Math.floor(Math.random()*36)];}}while(s.indexOf("edit")!==-1);
   return s;}
-/* キーの無い学生に自動発行する（編集画面でのみ使用）。追加した数を返す */
+/* ���ーの無い学生に自動発行する（編集画面でのみ使用）。追加した数を返す */
 function ensureStudentKeys(){let n=0;(latePersons||[]).forEach(p=>{if(p&&!p.key){p.key=genKey();n++;}});return n;}
 /* ===== 設定（マスタ）駆動 =====
    学校名・コース・学年・教室・時限・曜日を編集画面の「設定」から登録し、サーバーに保存する。
@@ -2590,7 +2595,7 @@ function renderClass(){
   }else{
     // 複数の学年・コースにまたがる結果も、学年×コースごとの時間割グリッドで表示する
     note.innerHTML='<div class="mode-note">複数の学年・コースに該当したため、<b>組み合わせごとの時間割</b>で表示中。'+(isEditable()?'編集するには学年とコースを選んでください。':'')+'</div>';
-    // グループ化：学年 → コース（定義順）
+    // グループ化：学年 → ���ース（定義順）
     const groups={};
     rows.forEach(r=>{const k=r.grade+"|"+worldShortFull(r.world);(groups[k]=groups[k]||[]).push(r);});
     const keys=Object.keys(groups).sort((a,b)=>{
@@ -3779,7 +3784,7 @@ function offerRegisterCourses(records){
   const unknown=unknownCoursesIn(records);
   if(!unknown.length)return 0;
   const lines=unknown.map(u=>`・${u.name}（${u.grades.join("・")}年）`).join("\n");
-  const msg=`読み込んだデータに、設定に登録されていないコースが ${unknown.length}件 ありました。\n\n${lines}\n\n`+
+  const msg=`読���込んだデータに、設定に登録されていないコースが ${unknown.length}件 ありました。\n\n${lines}\n\n`+
     `このまま設定に追加すると、コースの絞り込みボタンに表示され、色や正式名称も設定できるようになります。\n追加しますか？\n（「キャンセル」を選ぶと、時間割には表示されますが絞り込みはできません）`;
   if(!confirm(msg))return 0;
   const n=addCoursesToConfig(unknown);

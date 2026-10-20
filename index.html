@@ -642,6 +642,11 @@
   .setup-head h2{margin:8px 0 10px;font-size:1.6rem;color:#202124;font-weight:500}
   .setup-head p{font-size:.88rem;color:#5F6368;line-height:1.8;margin:0}
 </style>
+<!-- Vercel Web Analytics -->
+<script>
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
 <header id="appHeader"><div class="wrap">
@@ -943,7 +948,7 @@ var VIEWER_WORLD=(function(){try{const m=location.search.match(/[?&]w=([^&]+)/);
   return decodeURIComponent(m[1]);}catch(e){return null;}})();
 var VIEWER_GRADE=(function(){try{const m=location.search.match(/[?&]g=([1-4])(?:[^0-9]|$)/);return m?+m[1]:null;}catch(e){return null;}})();
 /* 年度付き閲覧URL（?y=2026）。閲覧時にサーバーの現年度と一致しなければ案内を表示し、時間割は見せない。
-   卒業生などが古いURL・素のURLで最新年度を見続けないための仕組み。 */
+   卒���生などが古いURL・素のURLで最新年度を見続けないための仕組み。 */
 var VIEWER_YEAR=(function(){try{const m=location.search.match(/[?&]y=(\d{4})(?:[^0-9]|$)/);return m?+m[1]:null;}catch(e){return null;}})();
 /* ===== PWA ===== */
 // Service Worker登録（https時のみ。file://では何もしない）
@@ -1136,7 +1141,7 @@ function snapshot(label){
   }catch(e){logErr("snapshot",e);}
 }
 function undoLast(){
-  if(!UNDO.length){alert("元に戻せる操作がありません。");return;}
+  if(!UNDO.length){alert("元に戻せる操作が��りません。");return;}
   const s=UNDO.pop();
   if(!confirm(`直前の操作「${s.label}」を取り消して、その前の状態に戻します。\nよろしいですか？`)){UNDO.push(s);return;}
   earlyRecords=s.early;lateRecords=s.late;latePersons=s.persons;lateP=s.lateP;earlyP=s.earlyP;
@@ -1269,7 +1274,7 @@ function rebuildFromCFG(){
   try{rebuildPersonPick();}catch(e){logErr("学生一覧の作り直し",e);}
   applyViewerSelection();
 }
-/* コースURL（?w=）を、設定が届いてから表示名に解決して選択状態にする */
+/* コースURL（?w=）を、設定が��いてから表示名に解決して選択状態にする */
 function applyViewerSelection(){
   if(!VIEWER_MODE||!VIEWER_WORLD)return;
   const c=courseOf(VIEWER_WORLD);
@@ -2148,7 +2153,7 @@ function renderEditToolbar(){
     // 前期：後期と同じ操作感（常に編集できる）
     tb.innerHTML=`<div class="edit-toolbar" style="background:var(--accent-soft);border-color:#cfe6ee">
       <span class="et-label" style="color:var(--accent)">${termLabel("early")}</span>
-      <span style="font-size:.82rem;color:var(--ink-soft)">学年とコースを選ぶと、表のマスをクリックして授業を編集できます。</span>
+      <span style="font-size:.82rem;color:var(--ink-soft)">学年とコー��を選ぶと、表のマスをクリックして授業を編集できます。</span>
       <button class="btn ghost" id="toggleProgress" style="margin-left:auto">入力状況</button>
       <button class="btn ghost" id="checkAll">整合チェック</button>
       <button class="btn ghost" id="printClass">印刷</button>
@@ -2570,7 +2575,7 @@ function renderClass(){
   }
   if(!rows.length){
     if(isLate()){
-      if(isEditable()){note.innerHTML='<div class="mode-note e"><b>後期編集モード</b>　学年とコースを選ぶと、編集用の週間表が開きます。空の状態から授業を入力していけます。</div>';
+      if(isEditable()){note.innerHTML='<div class="mode-note e"><b>後期編集モ���ド</b>　学年とコースを選ぶと、編集用の週間表が開きます。空の状態から授業を入力していけます。</div>';
         out.innerHTML='<div class="empty"><div class="big">学年とコースを選んでください</div><div>後期の授業をマス目に入力していきます。</div></div>';return;}
       note.innerHTML='<div class="mode-note"><b>後期</b>　学年とコースを選ぶと、後期の週間表を表示します。</div>';
       out.innerHTML='<div class="empty"><div class="big">学年とコースを選んでください</div></div>';return;}
@@ -2796,7 +2801,7 @@ function renderCellList(){
       <div class="cl-main"><b>${esc(r.subject)}</b>${r.teacher?` ／ ${esc(r.teacher)}`:""}${r.room?` ／ ${esc(r.room)}`:""}</div>
       <button class="cl-edit" data-i="${i}">編集</button><button class="cl-del" data-i="${i}">削除</button></div>`).join("")+
     `<button class="cl-add" id="clAddBtn">＋ この枠に授業を追加</button>`+
-    `<button class="cl-add" id="slotCopyBtn" style="margin-top:4px">⧉ この枠を他のコマへコピー</button>`;
+    `<button class="cl-add" id="slotCopyBtn" style="margin-top:4px">⧉ この��を他のコマへコピー</button>`;
   const scb=el.querySelector("#slotCopyBtn");if(scb)scb.onclick=(e)=>{e.stopPropagation();openSlotCopy();};
   el.querySelectorAll(".cl-edit").forEach(b=>b.onclick=(e)=>{e.stopPropagation();editing.idx=+b.dataset.i;loadFormFromEditing();renderCellList();updateConflict();updateCopyArea();});
   el.querySelectorAll(".cl-item").forEach(it=>it.onclick=()=>{editing.idx=+it.dataset.i;loadFormFromEditing();renderCellList();updateConflict();updateCopyArea();});
@@ -3198,7 +3203,7 @@ function renderPcCellList(){
   if(fl){fl.style.display="";
     fl.innerHTML=(pcEdit.idx<pcEdit.recs.length)
       ?`<span class="fl-edit">${pcEdit.idx+1}件目を編集中</span>`
-      :`<span class="fl-add">新しい授業を追加</span>`;}
+      :`<span class="fl-add">新���い授業を追加</span>`;}
   document.getElementById("pcTitle").textContent=multi?"授業を編集（複数）":"授業を編集";
 }
 function pcAddMore(){
@@ -3776,7 +3781,7 @@ function offerRegisterCourses(records){
   if(!unknown.length)return 0;
   const lines=unknown.map(u=>`・${u.name}（${u.grades.join("・")}年）`).join("\n");
   const msg=`読み込んだデータに、設定に登録されていないコースが ${unknown.length}件 ありました。\n\n${lines}\n\n`+
-    `このまま設定に追加すると、コースの絞り込みボタンに表示され、色や正式名称も設定できるようになります。\n追加しますか？\n（「キャンセル」を選ぶと、時間割には表示されますが絞り込みはできません）`;
+    `このまま設定に追加すると、コースの絞り込みボタンに表示され、色や正式���称も設定できるようになります。\n追加しますか？\n（「キャンセル」を選ぶと、時間割には表示されますが絞り込みはできません）`;
   if(!confirm(msg))return 0;
   const n=addCoursesToConfig(unknown);
   if(n){
